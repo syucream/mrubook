@@ -188,3 +188,100 @@ mruby 実行形式
 
   - 実行処理は mrb_top_run() を呼ぶことで行う
 
+mruby コアデータ構造
+##########################
+
+* RiteVM の実行状態や実行対象の手続きに関していくつものデータ構造が存在する
+
+mrb_state
+*********
+
+* http://qiita.com/miura1729/items/822a18051e8a97244dc3 が参考になりそう。
+
+* C で mrbgem を実装しようとするとちらほら目にする構造体
+* mruby の VM の状態を保持
+* 各基本クラスへのポインタやGC情報、グローバル変数などを格納する
+
+* RiteVM の実行コンテキストをもつ
+
+.. code :: c
+
+  struct mrb_context *c;
+  struct mrb_context *root_c;
+
+* mruby 組み込みクラスの定義へのポインタを持つ
+
+  - これらはほぼ全て（全部じゃないよね？） init された後は書き換わることは無い
+  - string.c とか init 関数毎に代入箇所が散らばっているので注意！
+  
+.. code :: c
+
+  struct RClass *object_class;            /* Object class */
+  struct RClass *class_class;
+  struct RClass *module_class;
+  struct RClass *proc_class;
+  struct RClass *string_class;
+  struct RClass *array_class;
+  struct RClass *hash_class;
+
+  struct RClass *float_class;
+  struct RClass *fixnum_class;
+  struct RClass *true_class;
+  struct RClass *false_class;
+  struct RClass *nil_class;
+  struct RClass *symbol_class;
+  struct RClass *kernel_module;
+
+mrb_context
+************
+
+* prev
+
+  - 以前のコンテキスト
+  - 例えば Fiber における親 fiber のコンテキスト
+  - 例えば ... ほかにある？
+
+* ...
+
+* status
+
+  - そのコンテキストの持ち主となる fiber の実行状態
+  - 詳しくは Fiber の項目を参考
+
+* fib
+
+  - そのコンテキストの持ち主となる fiber へのポインタ
+  - そもそも fiber で実行していない場合...どうなる？ NULL ？
+
+.. code :: c
+
+  struct mrb_context {
+    struct mrb_context *prev;
+  
+    mrb_value *stack;                       /* stack of virtual machine */
+    mrb_value *stbase, *stend;
+  
+    mrb_callinfo *ci;
+    mrb_callinfo *cibase, *ciend;
+  
+    mrb_code **rescue;                      /* exception handler stack */
+    int rsize;
+    struct RProc **ensure;                  /* ensure handler stack */
+    int esize;
+  
+    enum mrb_fiber_state status;
+    mrb_bool vmexec;
+    struct RFiber *fib;
+  };
+
+mrb_callinfo
+************
+
+* メソッド呼び出しに関する情報を保持？
+* 与えられた引数の数など
+
+RProc
+******
+
+* mruby の Proc オブジェクト型
+* このオブジェクトを VM で実行して mruby で処理を行うイメージ

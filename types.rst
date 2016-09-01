@@ -7,26 +7,87 @@ mrb_value
 *********
 
 * mruby で扱われる任意の値。
-* 設定依存で boxing される
+* 設定依存で Boxing される
 
-  - mrb_value のサイズをどの程度にしたいかでも変わる？ float, double, ...
   - デフォルトでは boxing_no
+  - NaN Boxing や Word Boxing のオプションが提供される。使用する場合はそれらの制約に気をつける必要がある
 
-* boxing_no の場合は int,float,void*,sym の union になる
-* mrb_vtype の型情報を持つ
+RClass
+******
+
+* mruby のクラス
+* iv は Instance variable table 変数
+
+  - セグメント(TODO: 定義をちゃんと調べる)ごとのサイズとルートセグメントへのポインタをもつ　
+
+* mt
+
+  - struct kh_mt はそのままの名前で定義されていないので注意！
+  
+    * kh_xxx は khash.h の KHASH_DECLARE マクロでプリプロセッサではじめて定義される
+  
+  - mt は mark table ? GC に使うっぽい？ TODO: gc.c とか読む
+  - khash は mruby の hash table のはず TODO: khash の詳細を追う
+
+* super
+
+  - そのまんま、親クラスのポインタ
+
+.. code :: c
+
+  struct RClass {
+    MRB_OBJECT_HEADER;
+    struct iv_tbl *iv;
+    struct kh_mt *mt;
+    struct RClass *super;
+  };
+
+RObject
+********
+
+* mruby のオブジェクト
+* mrb_obj_ptr マクロで mrb_value から RObject へ変換できる
+
+* 下記のような定義になるはず
+
+  - 一部メンバは MRB_OBJECT_HEADER マクロで展開される
+
+.. code :: c
+
+  struct RObject {
+    // MRB_OBJECT_HEADER
+    enum mrb_vtype tt:8
+    uint32_t color:3;
+    uint32_t flags:21;
+    struct RClass *c;
+    struct RBasic *gcnext;
+
+    // RClass のみ
+    struct iv_tbl *iv;
+  };
+
+* struct RClass *c;
+
+  - オブジェクトのクラスへのポインタ
+  - mrb_class() 関数では、引数の mrb_value が組み込みクラス以外であった場合にはこの値を返す
 
 mrb_int
 *******
 
-整数型。サイズは環境依存
+* 整数型。サイズは環境依存
 
-mrb_float,mrb_double
+mrb_float
 ********************
 
-浮動小数点型
+* 浮動小数点数型
+* MRB_USE_FLOAT を define しない限りは実体は C の double 型になる
 
-mrb_value への変換
+
+mrb_value の型変換
 ******************
+
+別の型から mrb_value への変換
+=============================
 
 mrb_int などから mrb_value 型表現へ変換する関数が存在
 
@@ -41,60 +102,106 @@ mrb_int などから mrb_value 型表現へ変換する関数が存在
 * mrb_undef_value()
 
 mrb_value から別の型への変換
-****************************
+=============================
 
 * mrb_str_to_cstr()
 
-  - String クラスの mrb_value から char* へ変換
+  - char* へ変換
 
 * mrb_string_to_cstr()
 
-  - String クラスの mrb_value から const char* へ変換
+  - const char* へ変換
   - TODO: mrb_str_to_cstr() との違いを記述
 
-RClass
-******
+* mrb_class_ptr(v)
 
-mruby のクラス
+  - struct RClass* へ変換
+
+* mrb_obj_ptr() マクロ
+
+  - RObject* へ変換
+
+* mrb_ptr() マクロ
+
+  - void* へ変換
+  - Boxing は内部的に勝手に考慮する
+
+* mrb_cptr() マクロ
+
+  - mrb_ptr() マクロのエイリアス
+
+mrb_value の型情報の確認
+************************
 
 mrb_vtype()
-***********
+=============================
 
-mrb_value の型情報(enum) を返す
+* mrb_value の型情報(enum mrb_vtype) を返す
 
+mrb_value の型チェック
+=============================
 
-mruby コアデータ構造
-##########################
+* mruby のヘッダでいくつか型チェック用のマクロが用意されている
 
-mrb_state
-*********
+  - NaN Boxing されているかどうかも考慮してチェックする
 
-* http://qiita.com/miura1729/items/822a18051e8a97244dc3 が参考になりそう。
+* mrb_fixnum_p(o)
 
-* C で mrbgem を実装しようとするとちらほら目にする構造体
-* mruby の VM の状態を保持
-* 各基本クラスへのポインタやGC情報、グローバル変数などを格納する
+  - o が Fixnum 型であれば true を返す
 
-mrb_context
-************
+* mrb_undef_p(o)
 
-* 実行中のメソッドのコンテキスト情報を保持しているはず
+  - o が Undef 型であれば true を返す
 
-mrb_callinfo
-************
+* mrb_nil_p(o)
 
-* メソッド呼び出しに関する情報を保持？
-* 与えられた引数の数など
+  - o が Nil 型であれば true を返す
 
-RProc
-******
+* mrb_bool(o)
 
-* mruby の Proc オブジェクト型
-* このオブジェクトを VM で実行して mruby で処理を行うイメージ
+  - o が True 型であれば true を返し、 False 型であれば false を返す
+
+* mrb_float_p(o)
+
+  - o が Float 型であれば true を返す
+
+* mrb_symbol_p(o)
+
+  - o が Symbol 型であれば true を返す
+
+* mrb_array_p(o)
+
+  - o が Array 型であれば true を返す
+
+* mrb_string_p(o)
+
+  - o が String 型であれば true を返す
+
+* mrb_hash_p(o)
+
+  - o が Hash 型であれば true を返す
+
+* mrb_cptr_p(o)
+
+  - o が Cptr 型であれば true を返す
+
+* mrb_exception_p(o)
+
+  - o が Exception 型であれば true を返す
+
+* mrb_test(o)
+
+  - mrb_bool(o) のエイリアス
+
+* mrb_regexp_p
+
+  - 第二引数の mrb_value が Regexp 型であれば true を返す
+  - これはマクロではなく C の関数
 
 mruby スクリプトでも使う型
 ##########################
 
+* 合計 23 個の型が存在する
 * MRB_TT_FALSE
 
   - 真偽値。 false を表す
@@ -106,6 +213,22 @@ mruby スクリプトでも使う型
 * MRB_TT_TRUE
 
   - 真偽値。 true を表す
+
+* MRB_TT_FIXNUM
+
+  - 整数型
+
+...
+
+* MRB_TT_OBJECT
+
+  - オブジェクト型
+  - TODO: 詳細は別途調べる
+
+* MRB_TT_CLASS
+
+  - クラス型
+  - TODO: 詳細は別途調べる
 
 ...
 
@@ -122,7 +245,8 @@ NaN Boxing
 NaN Boxing とは
 ***************
 
-* double 型の冗長な NaN の表現を横取りして、少ないビット数で他の変数の値と型の情報を埋め込むテクニック？
+* 前提として、 double 型は NaN の表現に使用しているビット幅が冗長
+* 一部分を横取りして、少ないビット数で他の変数の値と型の情報を埋め込むテクニックが Nan Boxing
 * mruby の実装では 64 ビットで変数の型情報まで保持させることができる
 
   - とは言っても制約がある
