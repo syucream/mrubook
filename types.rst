@@ -121,6 +121,10 @@ mrb_value から別の型への変換
 
   - RObject* へ変換
 
+* mrb_ary_ptr(v) / RARRAY(v)
+
+  - struct RArray* へ変換
+  
 * mrb_ptr() マクロ
 
   - void* へ変換

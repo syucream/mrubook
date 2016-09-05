@@ -78,9 +78,24 @@
 リソース管理系
 **************
 
-* new
-* GC
+new する系
+===========
 
+* mrb_obj_new()
+
+  - 新しいオブジェクトを new します
+  - mruby の世界でいう ExampleClass.new 的な操作になります
+
+* mrb_class_new_instance()
+
+  - mrb_obj_new() のエイリアスです
+
+* mrb_instance_new()
+
+  - mrb_obj_new() とほぼおなじ？
+  - 引数にブロックを受け取れるとか引数の型が違うとかに差分がありそう
+
+ 
 エラー・例外系
 **************
 
@@ -89,4 +104,30 @@
   - 例外を投げます
   - mrb_state の jmp 先がなかったら abort() します
   - mrb_raisef() を読んだ場合は例外メッセージをフォーマット指定できます
+
+未分別
+**************
+
+* mrb_gv_get(mrb, sym)
+
+  - sym が指すグローバル変数を取得する
+  - やっていることはインスタンス変数の取得とほぼおなじ
+    
+    * globals グローバル変数テーブル
+
+* mrb_gv_set(mrb_state \*mrb, mrb_sym sym, mrb_value v)
+
+  - v を新たにグローバル変数として、 sym シンボルで登録する
+
+* mrb_obj_eq(mrb, v1, v2)
+
+  - v1 と v2 を比較し、同値の場合に true を返す
+  - 比較方法
+
+    * v1 と v2 の型を比較
+    * 型ごとにキャストした結果を比較
+
+* mrb_obj_equal()
+
+  - mrb_obj_eq() のエイリアス
 
