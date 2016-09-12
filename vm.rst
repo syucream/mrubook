@@ -150,7 +150,7 @@ RiteVM の機械語
 
 ...
 
-mrb_irep (instruction representation の略？)
+mrb_irep (instruction? intermediate? representation の略？)
 **********************************************
 
 * XXX: この記述は後で別ファイルに移動するかも
@@ -174,6 +174,30 @@ mrb_irep (instruction representation の略？)
 * iseq: コードセグメントの先頭番地へのポインタ
 
   - RiteVM に処理させたい際は、 iseq を pc に突っ込んで開始する
+
+* 定義については下記の通り
+
+.. code :: c
+
+  /* Program data array struct */
+  typedef struct mrb_irep {
+    uint16_t nlocals;        /* Number of local variables */
+    uint16_t nregs;          /* Number of register variables */
+    uint8_t flags;
+  
+    mrb_code *iseq;
+    mrb_value *pool;
+    mrb_sym *syms;
+    struct mrb_irep **reps;
+  
+    struct mrb_locals *lv;
+    /* debug info */
+    const char *filename;
+    uint16_t *lines;
+    struct mrb_irep_debug_info* debug_info;
+  
+    size_t ilen, plen, slen, rlen, refcnt;
+  } mrb_irep;
 
 ...
 
