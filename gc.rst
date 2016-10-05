@@ -5,7 +5,9 @@ GC
 *****
 
 mruby の GC はマーク＆スイープに基づくインクリメンタル GC と世代別 GC のあわせ技で実行される。
-また GC 処理の間隔などを制御したり、 C ライブラリに配慮した構造があったりする。
+また GC 処理の間隔などを制御したり、 C ライブラリに配慮した構造がある。
+
+Matz の mruby 本に非常にやさしい解説が書かれているので、それも合わせて読むと良さげである。
 
 インクリメンタル GC
 -------------------
@@ -14,9 +16,9 @@ mruby の GC はマーク＆スイープに基づくインクリメンタル GC 
 
   - ステップの実行単位は制御可能
 
-* 3 つのフェーズが存在す
+* 3 つのフェーズが存在
 
-  - スキャンフェーズ
+  - ルートスキャンフェーズ
 
     * GC のルートオブジェクトを検出する
 
@@ -31,13 +33,16 @@ mruby の GC はマーク＆スイープに基づくインクリメンタル GC 
 世代別 GC
 ---------
 
-* マイナー GC
+* 作られてからの経過時間によって「世代」を分離し、若い世代のオブジェクトを頻繁に GC する
+* mruby では 2 世代で GC を行う
 
-  - 若い世代のみ対象にした GC
+  - マイナー GC
 
-* メジャー GC
+    * 若い世代のみ対象にした GC
 
-  - 若い世代のみならず、古い世代も対象にした GC
+  - メジャー GC
+
+    * 若い世代のみならず、古い世代も対象にした GC
 
 GC の実行タイミング
 --------------------
@@ -97,7 +102,7 @@ GC 周りの基本構造
   +-+-+-+-+-+-+-+-+-+-+-+-+-+- ~ -+
   | | | | | | | | | | | | | |     |
   +-+-+-+-+-+-+-+-+-+-+-+-+-+- ~ -+
-  ^ <-gray--> ^ <-----white-----> ^
+  ^ <-black-> ^ <-----white-----> ^
   0        arena_idx          arena_capa
      
 * mrb_gc
@@ -168,6 +173,23 @@ GC 周りの基本構造
 
   - out_of_memory
   - majorgc_old_threshold;
+
+* mrb_heap_page
+
+  - prev
+  - next
+
+    - ヒープのリストの、前のノードと後ろのノードへのポインタ
+
+  - free_prev
+  - free_next
+
+    - ヒープのフリーなリストの、前のノードと後ろのノードへのポインタ
+
+  - old
+  
+    * そのページの世代を bool で示す
+    * true なら古い世代。 false なら若い世代(マイナー GC の対象)
 
 Internals
 **********
@@ -275,6 +297,63 @@ GC のエントリポイント
   - mrb->allocf に割り当てを行ってもらう
   - 割り当てに失敗した場合にフル GC を実行して再挑戦する
 
+* mrb_realloc()
+
+  - mrb_realloc_simple を呼んでメモリを割り当てる
+  - 十分なメモリを割り当てられなかった場合は out_of_memory フラグを true にして例外を投げる
+
+* mrb_malloc()
+
+  - mrb_realloc() を、割り当て済みポインタを nullptr にしているだけのラッパー
+
+* mrb_malloc_simple()
+
+  - mrb_realloc_simple() を、割り当て済みポインタを nullptr にしているだけのラッパー
+
+* mrb_calloc()
+
+  - nelem * len のサイズの領域を mrb_malloc() で割り当てる
+  - 確保した領域はゼロクリアされる
+
+* mrb_free()
+
+  - mrb->allocf を第三引数 0 で呼び出して free してもらう
+
+* mrb_object_dead_p()
+
+  - 引数で渡されたオブジェクトが死んでいる扱いであれば true を返す
+  - 処理的には white でマークされていないか、型情報が FREE でないかをチェックしている
+
+ヒープ管理周り
+**************
+
+* link_heap_page()
+
+  - 引数で渡された heap_page を、 heaps のリストに加える
+
+* unlink_heap_page()
+
+  - 引数で渡された heap_page を、 heaps のリストから外す
+
+* link_free_heap_page()
+
+  - 引数で渡された heap_page を、 free_heaps のリストに加える
+
+* unlink_free_heap_page()
+
+  - 引数で渡された heap_page を、 free_heaps のリストから外す
+
+* add_heap()
+
+  - 新しい heap_page を mrb_calloc で割り当てる
+  - 割り当てが成功したなら、 heaps, free_heaps リストにそれを加える
+
+* free_heap()
+
+  - heaps リストの各ページをチェックしていく
+  - obj_free() でデストラクタを呼び出していく
+  - mrb_free() で指定の heap_page を解放する
+
 C APIs
 *******
 
@@ -318,7 +397,7 @@ C APIs
 * mrb_gc_protect()
 
   - arena のキャパを増やし、引数の mrb_value を arena の idx の領域に格納する
-  - 指定の mrb_value を arena 内に保護して格納するイメージ
+  - 指定の mrb_value を arena 内に格納して、（直近の GC から？）保護するイメージ
 
 * mrb_field_write_barrier(mrb_state \*mrb, struct RBasic \*obj, struct RBasic \*value)
   
