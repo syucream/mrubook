@@ -1,10 +1,16 @@
 Fiber
 #####
 
+Overview
+********
+
 * mruby の軽量スレッドである Fiber について、 mruby-fiber/ を読む
 
+Details
+*******
+
 Fiber クラスについて
-*********************
+=====================
 
 * mruby 組み込み型のひとつ
 * 実装は割とシンプル
@@ -24,11 +30,11 @@ C の RFiber の定義
     struct mrb_context *cxt;
   };
 
-メソッド
-=======
+APIs
+*******
 
 initialize
-----------
+==========
 
 * MRB_ARGS_NONE であるが実際は block を引数にとる
 
@@ -50,23 +56,23 @@ initialize
   - コンストラクタが終わった状態では MRB_FIBER_CREATED
 
 resume
--------
+=======
 
 * 任意個の引数を受ける
 * 実際の実行は fiber_switch() で。。。
 
 transfer
---------
+========
 
 * TODO: 気が向いたら読む
 
 alive?
-------
+======
 
 * TODO: 気が向いたら読む
 
 \==
-----
+====
 
 * TODO: 気が向いたら読む
 
