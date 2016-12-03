@@ -1,6 +1,7 @@
 # mrubook
 
 A documentation about mruby internals.
+https://syucream.github.io/mrubook/
 
 # Note
 
