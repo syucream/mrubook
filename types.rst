@@ -67,7 +67,7 @@ RObject
     struct iv_tbl *iv;
   };
 
-* struct RClass *c;
+* struct RClass*
 
   - オブジェクトのクラスへのポインタ
   - mrb_class() 関数では、引数の mrb_value が組み込みクラス以外であった場合にはこの値を返す
