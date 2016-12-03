@@ -1,5 +1,5 @@
-mrbgems 周りの情報
-##################
+mrbgems
+########
 
 
 Details

@@ -30,6 +30,38 @@ C の RFiber の定義
     struct mrb_context *cxt;
   };
 
+fiber_switch()
+===============
+
+* まずは現在の状態をチェック。下記条件にマッチした場合は FIBER_ERROR を raise する
+
+  - transfer された後の fiber を resume した
+  - 実行中の fiber を resume した
+  - 既に終了した fiber を resume した
+
+* value へ代入しているあたりはよくわからん
+* mrb_vm_exec() を介して RiteVM に mrb_context の処理の実行を開始させる
+
+  - yield されたら返ってくる。その時の戻り値を取得する
+  - mrb_vm_exec() 呼び出し前に退避させておいた、 resume 元の mrb_context を mrb_state に戻す
+
+* 最後に戻り値を返して終了
+
+mrb_fiber_yield()
+==================
+
+* yield しようとしている fiber が root になっていないかチェック
+
+  - root からは yield 先がいない！ FIBER_ERROR を raise する
+
+* mrb_state の mrb_context を prev のもの、つまり親ファイバのものに戻す
+* fiber_result() で yield クラスメソッドの引数をそのまま親に返す
+
+fiber_result()
+===============
+
+渡された array? を元に、 nil か一つの値か、あるいは array 全体を取り出す
+
 APIs
 *******
 
@@ -112,43 +144,3 @@ current
 
 * TODO: 詳細確認する
 
-Fiber Internals
-****************
-
-fiber_switch()
-===============
-
-* まずは現在の状態をチェック。下記条件にマッチした場合は FIBER_ERROR を raise する
-
-  - transfer された後の fiber を resume した
-  - 実行中の fiber を resume した
-  - 既に終了した fiber を resume した
-
-* value へ代入しているあたりはよくわからん
-* mrb_vm_exec() を介して RiteVM に mrb_context の処理の実行を開始させる
-
-  - yield されたら返ってくる。その時の戻り値を取得する
-  - mrb_vm_exec() 呼び出し前に退避させておいた、 resume 元の mrb_context を mrb_state に戻す
-
-* 最後に戻り値を返して終了
-
-mrb_fiber_yield()
-==================
-
-* yield しようとしている fiber が root になっていないかチェック
-
-  - root からは yield 先がいない！ FIBER_ERROR を raise する
-
-* mrb_state の mrb_context を prev のもの、つまり親ファイバのものに戻す
-* fiber_result() で yield クラスメソッドの引数をそのまま親に返す
-
-fiber_result()
-===============
-
-渡された array? を元に、 nil か一つの値か、あるいは array 全体を取り出す
-
-疑問
-*********************
-
-* mrb_context, mrb_state は fiber の存在をかなり意識した作りになっている
-* Fiber が定義されていない場合はどうなるのか？ root の fiber というものは現れるのか？
