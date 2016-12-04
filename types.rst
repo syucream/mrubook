@@ -38,9 +38,9 @@ RClass
 
   struct RClass {
     MRB_OBJECT_HEADER;
-    struct iv_tbl *iv;
-    struct kh_mt *mt;
-    struct RClass *super;
+    struct iv_tbl \*iv;
+    struct kh_mt \*mt;
+    struct RClass \*super;
   };
 
 RObject
@@ -60,11 +60,11 @@ RObject
     enum mrb_vtype tt:8
     uint32_t color:3;
     uint32_t flags:21;
-    struct RClass *c;
-    struct RBasic *gcnext;
+    struct RClass \*c;
+    struct RBasic \*gcnext;
 
     // RClass のみ
-    struct iv_tbl *iv;
+    struct iv_tbl \*iv;
   };
 
 * struct RClass*

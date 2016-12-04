@@ -21,4 +21,5 @@ Contents:
    object
    proc
    types
+   variable
    vm

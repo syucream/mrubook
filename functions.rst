@@ -102,10 +102,11 @@ new する系
 エラー・例外系
 ==============
 
-* mrb_raise
+* mrb_raise(mrb_state \*mrb, struct RClass \*c, const char \*msg)
 
   - 例外を投げます
   - mrb_state の jmp 先がなかったら abort() します
+  - 第二引数は例外クラス、第三引数はメッセージを指定します
   - mrb_raisef() を読んだ場合は例外メッセージをフォーマット指定できます
 
 未分別
