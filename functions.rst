@@ -12,18 +12,31 @@ Details
 定義する系
 ==========
 
+struct RClass \*mrb_define_class(mrb_state \*mrb, const char \*name, struct RClass \*super)
+---------------------------------------------------------------------------------------------
+
+* 新しいクラスを定義します
+
+struct RClass \*mrb_define_module(mrb_state \*, const char*)
+---------------------------------------------------------------------------------------------
+
+* 新しいモジュールを定義します
+
+void mrb_define_class_method(mrb_state \*, struct RClass \*, const char \*, mrb_func_t, mrb_aspec)
+---------------------------------------------------------------------------------------------------
+
+* 新しくクラスメソッドを定義します
+
+  - 第 2 引数が追加する先のクラスになります
+  - 第 4 引数にクラスメソッドの定義にあたる関数ポインタを渡します
+
 クラス・モジュール関係
-----------------------
+---------------------------------------------------------------------------------------------
 
-だいたい名前の通りのしごとをします
-
-* mrb_define_class()
-* mrb_define_module()
 * mrb_singleton_class()
 * mrb_include_module()
 * mrb_prepend_module()
 * mrb_define_method()
-* mrb_define_class_method()
 * mrb_define_singleton_method()
 * mrb_define_module_function()
 

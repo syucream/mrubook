@@ -4,6 +4,14 @@ Class
 APIs
 *****
 
+void mrb_define_method_raw(mrb_state\*, struct RClass\*, mrb_sym, struct RProc \*)
+===================================================================================
+
+* RProc 構造体を使ってクラスメソッドを定義する
+
+  * mrb_define_method() では関数ポインタをメソッドの定義として渡していたが、こちらは RProc
+  * クラスの kh（内部的なハッシュ、で合ってる？）に第三引数のシンボルのキーに対し RProc ポインタをセット
+
 mrb_method_search()
 ===================
 
