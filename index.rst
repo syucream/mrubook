@@ -17,6 +17,7 @@ Contents:
    fiber
    functions
    gc
+   memory
    mrbgems
    object
    proc
