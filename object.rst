@@ -31,7 +31,7 @@ Details
 
 * flags
 
-  - TODO: あとで詳細を調べる
+  - 後述
 
 * c
 
@@ -42,7 +42,7 @@ Details
   - GC に関する情報・・・のはず
 
 RBasic
-*******
+=======
 
 * 共通のデータ構造のみメンバにもつ
 
@@ -51,7 +51,18 @@ RBasic
   struct RBasic {
     MRB_OBJECT_HEADER;
   };
-  
+
+フラグ
+=======
+
+* MRB_FLAG_IS_FROZEN
+
+  - 変更禁止
+
+* MRB_FLAG_IS_PREPENDED
+* MRB_FLAG_IS_ORIGIN
+
+
 RObject
 =======
 
@@ -63,3 +74,12 @@ RObject
     MRB_OBJECT_HEADER;
     struct iv_tbl *iv;
   };
+
+APIs
+*******
+
+mrb_obj_is_instance_of(mrb_state \*mrb, mrb_value obj, struct RClass\* c)
+=========================================================================
+
+* obj が c クラスのインスタンスである場合 true を返す
+

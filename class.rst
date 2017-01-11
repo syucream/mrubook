@@ -1,6 +1,9 @@
 Class
 #####
 
+Details
+********
+
 APIs
 *****
 
@@ -12,8 +15,8 @@ void mrb_define_method_raw(mrb_state\*, struct RClass\*, mrb_sym, struct RProc \
   * mrb_define_method() では関数ポインタをメソッドの定義として渡していたが、こちらは RProc
   * クラスの kh（内部的なハッシュ、で合ってる？）に第三引数のシンボルのキーに対し RProc ポインタをセット
 
-mrb_method_search()
-===================
+struct RProc \*mrb_method_search(mrb_state\*, struct RClass\*, mrb_sym)
+===========================================================================
 
 * RiteVM 中で定義済みのメソッドを探索する
 * 中で mrb_method_search_vm() を呼んでる

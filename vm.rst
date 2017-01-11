@@ -349,6 +349,19 @@ RiteVM バイトコードフォーマット
   +---------------------+
   *: irep, lineno, debug or lv
 
+RiteVM バイトコードのヘッダ
+----------------------------
+
+* rite_binary_header 構造体で表現される
+* フォーマットは下記の通り:
+
+  - 4 バイト: バイナリ ID。基本的に "RITE" という 4 文字が書かれる
+  - 4 バイト: バイナリバージョン。本文書の執筆段階では "0003"
+  - 2 バイト: バイナリの CRC
+  - 4 バイト: バイナリサイズ
+  - 4 バイト: コンパイラ名。 mrbc でビルドした場合は "MATZ"
+  - 4 バイト: コンパイラバージョン
+
 APIs
 *******
 
@@ -414,4 +427,12 @@ int mrb_dump_irep(mrb_state \*mrb, mrb_irep \*irep, uint8_t flags, uint8_t \*\*b
 * mrb_irep をバイトコードに dump する
 
   - 第 2 引数に dump 対象の mrb_irep を指定する
+  - 第 3 引数は dump 結果のフォーマットを指定
+
+    * DUMP_DEBUG_INFO: デバッグ情報を出力する
+    * DUMP_ENDIAN_BIG: ビッグエンディアンで出力
+    * DUMP_ENDIAN_LIL: リトルエンディアンで出力
+    * DUMP_ENDIAN_NAT: ネイティブのエンディアンで出力
+    * DUMP_ENDIAN_MASK: 上記 3 フラグを取り出す際のビットマスク
+
   - 第 4,5 引数に dump 結果のバイトコードがセットされる。これらは内部的に mrb_malloc() で領域確保がされる

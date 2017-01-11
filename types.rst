@@ -235,6 +235,10 @@ mruby スクリプトでも使う型
   - クラス型
   - TODO: 詳細は別途調べる
 
+* MRB_TT_SCLASS
+
+  - シングルトンクラス型
+
 ...
 
 NaN Boxing
