@@ -1,0 +1,167 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Proc &#8212; mrubook 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="値と型" href="types.html" />
+    <link rel="prev" title="Object" href="object.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="proc">
+<h1>Proc<a class="headerlink" href="#proc" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="details">
+<h2>Details<a class="headerlink" href="#details" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="rproc">
+<h3>RProc<a class="headerlink" href="#rproc" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>あるロジックの塊を示す構造<ul>
+<li>mrbc によるコンパイル結果の一つとしてこれを選べる</li>
+<li>RiteVM に mrb_run() を介して実行させることができる形式</li>
+</ul>
+</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">struct</span> <span class="n">RProc</span> <span class="p">{</span>
+  <span class="n">MRB_OBJECT_HEADER</span><span class="p">;</span>
+  <span class="n">union</span> <span class="p">{</span>
+    <span class="n">mrb_irep</span> \<span class="o">*</span><span class="n">irep</span><span class="p">;</span>
+    <span class="n">mrb_func_t</span> <span class="n">func</span><span class="p">;</span>
+  <span class="p">}</span> <span class="n">body</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">target_class</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">REnv</span> \<span class="o">*</span><span class="n">env</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="apis">
+<h2>APIs<a class="headerlink" href="#apis" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="struct-rproc-mrb-proc-new-mrb-state-mrb-irep">
+<h3>struct RProc <em>mrb_proc_new(mrb_state</em>, mrb_irep*)<a class="headerlink" href="#struct-rproc-mrb-proc-new-mrb-state-mrb-irep" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>RProc オブジェクトを新たに生成する<ul>
+<li>型は Proc になる</li>
+<li>親クラスは proc_class になる</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="mrb-proc-copy-struct-rproc-a-struct-rproc-b">
+<h3>mrb_proc_copy(struct RProc *a, struct RProc *b)<a class="headerlink" href="#mrb-proc-copy-struct-rproc-a-struct-rproc-b" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<div><ul class="simple">
+<li>a に b をコピーする</li>
+<li>中身としてはほぼポインタメンバのコピー。ディープコピーではない<ul>
+<li>irep の refcnt(参照カウンタ？) はインクリメントされる</li>
+<li>object じゃなくて内部データ構造であり、参照カウンタインクリメントされるということはポインタの指し先は a が生きれてば勝手に解放されない・・・か？</li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Proc</a><ul>
+<li><a class="reference internal" href="#details">Details</a><ul>
+<li><a class="reference internal" href="#rproc">RProc</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#apis">APIs</a><ul>
+<li><a class="reference internal" href="#struct-rproc-mrb-proc-new-mrb-state-mrb-irep">struct RProc <em>mrb_proc_new(mrb_state</em>, mrb_irep*)</a></li>
+<li><a class="reference internal" href="#mrb-proc-copy-struct-rproc-a-struct-rproc-b">mrb_proc_copy(struct RProc *a, struct RProc *b)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="object.html" title="previous chapter">Object</a></li>
+      <li>Next: <a href="types.html" title="next chapter">値と型</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/proc.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Ryo Okubo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/proc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

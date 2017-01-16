@@ -1,0 +1,286 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Fiber &#8212; mrubook 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="便利関数など" href="functions.html" />
+    <link rel="prev" title="Compiler" href="compiler.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="fiber">
+<h1>Fiber<a class="headerlink" href="#fiber" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>mruby の軽量スレッドである Fiber について、 mruby-fiber/ を読む</li>
+</ul>
+</div>
+<div class="section" id="details">
+<h2>Details<a class="headerlink" href="#details" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id1">
+<h3>Fiber クラスについて<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mruby 組み込み型のひとつ</li>
+<li>実装は割とシンプル<ul>
+<li>もともと、 mrb_state, mrb_context が「前のコンテキストに戻る」ことを考慮した作りになっている</li>
+<li>Fiber は mrb_context を持つ。これを mrb_state に対して「次/前のコンテキストに移る」操作を提供することで resume/yield を実現する</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="c-rfiber">
+<h3>C の RFiber の定義<a class="headerlink" href="#c-rfiber" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>単なる RiteVM の実行コンテキストを持ってるだけのオブジェクト</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">struct</span> <span class="n">RFiber</span> <span class="p">{</span>
+  <span class="n">MRB_OBJECT_HEADER</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">mrb_context</span> <span class="o">*</span><span class="n">cxt</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="fiber-switch">
+<h3>fiber_switch()<a class="headerlink" href="#fiber-switch" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>まずは現在の状態をチェック。下記条件にマッチした場合は FIBER_ERROR を raise する<ul>
+<li>transfer された後の fiber を resume した</li>
+<li>実行中の fiber を resume した</li>
+<li>既に終了した fiber を resume した</li>
+</ul>
+</li>
+<li>value へ代入しているあたりはよくわからん</li>
+<li>mrb_vm_exec() を介して RiteVM に mrb_context の処理の実行を開始させる<ul>
+<li>yield されたら返ってくる。その時の戻り値を取得する</li>
+<li>mrb_vm_exec() 呼び出し前に退避させておいた、 resume 元の mrb_context を mrb_state に戻す</li>
+</ul>
+</li>
+<li>最後に戻り値を返して終了</li>
+</ul>
+</div>
+<div class="section" id="mrb-fiber-yield">
+<h3>mrb_fiber_yield()<a class="headerlink" href="#mrb-fiber-yield" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>yield しようとしている fiber が root になっていないかチェック<ul>
+<li>root からは yield 先がいない！ FIBER_ERROR を raise する</li>
+</ul>
+</li>
+<li>mrb_state の mrb_context を prev のもの、つまり親ファイバのものに戻す</li>
+<li>fiber_result() で yield クラスメソッドの引数をそのまま親に返す</li>
+</ul>
+</div>
+<div class="section" id="fiber-result">
+<h3>fiber_result()<a class="headerlink" href="#fiber-result" title="Permalink to this headline">¶</a></h3>
+<p>渡された array? を元に、 nil か一つの値か、あるいは array 全体を取り出す</p>
+</div>
+</div>
+<div class="section" id="apis">
+<h2>APIs<a class="headerlink" href="#apis" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="initialize">
+<h3>initialize<a class="headerlink" href="#initialize" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>MRB_ARGS_NONE であるが実際は block を引数にとる<ul>
+<li>block が取れなかったら ARGUMENT_ERROR を raise する</li>
+</ul>
+</li>
+<li>RiteVM のコンテキストを初期化する<ul>
+<li>スタック領域の割当と初期化</li>
+<li>receiver （ってなんだろ）を block からコピー</li>
+<li>callinfo の割当と初期化</li>
+<li>callinfo 周りの調整<ul>
+<li>block のポインタをコピーしたり pc を設定したりレジスタ数を設定したり</li>
+<li>ここで設定した callinfo を元に resume されると処理実行が行われるのか</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>最後に fiber の状態を初期化<ul>
+<li>fiber は状態を持つ（そりゃそうか）</li>
+<li>コンストラクタが終わった状態では MRB_FIBER_CREATED</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="resume">
+<h3>resume<a class="headerlink" href="#resume" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>任意個の引数を受ける</li>
+<li>実際の実行は fiber_switch() で。。。</li>
+</ul>
+</div>
+<div class="section" id="transfer">
+<h3>transfer<a class="headerlink" href="#transfer" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>TODO: 気が向いたら読む</li>
+</ul>
+</div>
+<div class="section" id="alive">
+<h3>alive?<a class="headerlink" href="#alive" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>TODO: 気が向いたら読む</li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h3>==<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>TODO: 気が向いたら読む</li>
+</ul>
+</div>
+<div class="section" id="id3">
+<h3>クラスメソッド<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="yield">
+<h4>yield<a class="headerlink" href="#yield" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>任意個の引数を受ける</li>
+<li>実際の実行は mrb_fiber_yield() で。。。</li>
+</ul>
+</div>
+<div class="section" id="current">
+<h4>current<a class="headerlink" href="#current" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>TODO: 気が向いたら読む</li>
+</ul>
+</div>
+</div>
+<div class="section" id="id4">
+<h3>状態<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mrb_context メンバの status で管理される(Fiber以外でもこの変数使ってるのかな・・・？)</li>
+<li>以下のような状態をもつ</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">enum</span> <span class="n">mrb_fiber_state</span> <span class="p">{</span>
+  <span class="n">MRB_FIBER_CREATED</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+  <span class="n">MRB_FIBER_RUNNING</span><span class="p">,</span>
+  <span class="n">MRB_FIBER_RESUMED</span><span class="p">,</span>
+  <span class="n">MRB_FIBER_SUSPENDED</span><span class="p">,</span>
+  <span class="n">MRB_FIBER_TRANSFERRED</span><span class="p">,</span>
+  <span class="n">MRB_FIBER_TERMINATED</span><span class="p">,</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>状態遷移</p>
+<ul class="simple">
+<li>TODO: 詳細確認する</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Fiber</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#details">Details</a><ul>
+<li><a class="reference internal" href="#id1">Fiber クラスについて</a></li>
+<li><a class="reference internal" href="#c-rfiber">C の RFiber の定義</a></li>
+<li><a class="reference internal" href="#fiber-switch">fiber_switch()</a></li>
+<li><a class="reference internal" href="#mrb-fiber-yield">mrb_fiber_yield()</a></li>
+<li><a class="reference internal" href="#fiber-result">fiber_result()</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#apis">APIs</a><ul>
+<li><a class="reference internal" href="#initialize">initialize</a></li>
+<li><a class="reference internal" href="#resume">resume</a></li>
+<li><a class="reference internal" href="#transfer">transfer</a></li>
+<li><a class="reference internal" href="#alive">alive?</a></li>
+<li><a class="reference internal" href="#id2">==</a></li>
+<li><a class="reference internal" href="#id3">クラスメソッド</a><ul>
+<li><a class="reference internal" href="#yield">yield</a></li>
+<li><a class="reference internal" href="#current">current</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id4">状態</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="compiler.html" title="previous chapter">Compiler</a></li>
+      <li>Next: <a href="functions.html" title="next chapter">便利関数など</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/fiber.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Ryo Okubo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/fiber.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,616 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>GC &#8212; mrubook 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="khash" href="khash.html" />
+    <link rel="prev" title="便利関数など" href="functions.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="gc">
+<h1>GC<a class="headerlink" href="#gc" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>mruby の GC はマーク＆スイープに基づくインクリメンタル GC と世代別 GC のあわせ技で実行される。
+また GC 処理の間隔などを制御したり、 C ライブラリに配慮した構造がある。</p>
+<p>Matz の mruby 本に非常にやさしい解説が書かれているので、それも合わせて読むと良さげである。</p>
+</div>
+<div class="section" id="details">
+<h2>Details<a class="headerlink" href="#details" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id1">
+<h3>インクリメンタル GC<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>マーク＆スイープ GC をステップという単位に分割し、少しずつ処理する<ul>
+<li>ステップの実行単位は制御可能</li>
+</ul>
+</li>
+<li>3 つのフェーズが存在<ul>
+<li>ルートスキャンフェーズ<ul>
+<li>GC のルートオブジェクトを検出する</li>
+</ul>
+</li>
+<li>マークフェーズ<ul>
+<li>生きてるっぽいオブジェクトをマークする</li>
+</ul>
+</li>
+<li>スイープフェーズ<ul>
+<li>マークされていないオブジェクトを死んでいるものとみなし回収する</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h3>世代別 GC<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>作られてからの経過時間によって「世代」を分離し、若い世代のオブジェクトを頻繁に GC する</li>
+<li>mruby では 2 世代で GC を行う<ul>
+<li>マイナー GC<ul>
+<li>若い世代のみ対象にした GC</li>
+</ul>
+</li>
+<li>メジャー GC<ul>
+<li>若い世代のみならず、古い世代も対象にした GC</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id3">
+<h3>GC の実行タイミング<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>インクリメンタル GC<ul>
+<li>オブジェクトに新しくヒープを割り当てる際に、生きているオブジェクトがしきい値を超えていた場合に実行する</li>
+<li>しきい値には後述する interval_ratio という係数を付けることが可能</li>
+</ul>
+</li>
+<li>フル GC<ul>
+<li>手動で実行するか、 mrb_realloc_simple() で割り当てに失敗した場合のみ実行する</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id4">
+<h3>GC 周りの基本構造<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>GC root<ul>
+<li>GC のマーク&amp;スイープ操作の起点となるノード</li>
+<li>root から辿れるノードにはマークが付けられる</li>
+<li>GC_ROOT_NAME でマクロ定義されているシンボル名で、グローバル変数の Array としてルート情報が保持される</li>
+</ul>
+</li>
+<li>GC color<ul>
+<li>オブジェクトのマーク状況に関する情報</li>
+<li>三色抽象化 (tricolour abstraction) に基づく情報のはず</li>
+<li>white<ul>
+<li>マークされていない状態。 GC の対象となる。</li>
+<li>実際には white-A, white-B という 2 状態が存在するので</li>
+<li>white-A<ul>
+<li>現在の GC サイクル中に割り当てられた、新しいオブジェクト</li>
+</ul>
+</li>
+<li>white-B<ul>
+<li>スイープのターゲットとして確定したオブジェクト</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>gray<ul>
+<li>処理途中であることを示す状態</li>
+<li>マークされているが、その子オブジェクトはマークされていない状態</li>
+</ul>
+</li>
+<li>black<ul>
+<li>子オブジェクトも含めてマークされている状態</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>arena<ul>
+<li>C のコードで生成したオブジェクトを管理する領域</li>
+<li>gc_protect() で渡されたオブジェクトが arena で管理される</li>
+<li>arena_idx より低い領域で管理されるオブジェクトは、スキャンフェーズで生きているものとみなされる</li>
+<li>mrb_gc_arena_save() / mrb_gc_arena_restore() で arena_idx を操作し、 GC 対象範囲を変更することも可能</li>
+</ul>
+</li>
+</ul>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-</span> <span class="o">~</span> <span class="o">-+</span>
+<span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span>     <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-</span> <span class="o">~</span> <span class="o">-+</span>
+<span class="o">^</span> <span class="o">&lt;-</span><span class="n">black</span><span class="o">-&gt;</span> <span class="o">^</span> <span class="o">&lt;-----</span><span class="n">white</span><span class="o">-----&gt;</span> <span class="o">^</span>
+<span class="mi">0</span>        <span class="n">arena_idx</span>          <span class="n">arena_capa</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li>mrb_gc<ul>
+<li>sweeps<ul>
+<li>マークフェーズの結果、スイープのターゲットとなった heap_page のリスト</li>
+</ul>
+</li>
+<li>live<ul>
+<li>生きているオブジェクトの数</li>
+<li>この数がしきい値を超えた場合、 GC を実行する</li>
+</ul>
+</li>
+<li>arena<ul>
+<li>arena 領域</li>
+</ul>
+</li>
+<li>arena_capa<ul>
+<li>arena の容量</li>
+</ul>
+</li>
+<li>arena_idx<ul>
+<li>arena のインデックス</li>
+</ul>
+</li>
+<li>state<ul>
+<li>GC が今どのフェーズにいるのかを示す状態変数</li>
+</ul>
+</li>
+<li>gray_list<ul>
+<li>マークフェーズの結果の、 gray マークされたオブジェクトのリスト</li>
+</ul>
+</li>
+<li>atomic_gray_list<ul>
+<li>マークフェーズの最後に、再度 gray マークされることを保証すべきオブジェクトのリスト</li>
+<li>ライトバリア関数の使い方によってはこのリストが使われる</li>
+</ul>
+</li>
+<li>live_after_mark<ul>
+<li>マークフェーズの最後に、生きているとみなされる(black な)オブジェクトの数</li>
+</ul>
+</li>
+<li>threshold<ul>
+<li>GC 実行タイミングを図るためのしきい値</li>
+</ul>
+</li>
+<li>interval_ratio<ul>
+<li>threshold の計算に用いる係数</li>
+<li>live が threshold を超えたときにインクリメンタル GC が実行される</li>
+<li>この値が低い（100 に近い）ほど、頻繁に GC が実行されることになる</li>
+</ul>
+</li>
+<li>step_ratio<ul>
+<li>インクリメンタル GC の 1 ステップでどのくらい処理を進めるかの計算に用いる係数</li>
+</ul>
+</li>
+<li>disabled<ul>
+<li>GC を無効化しているかどうかのフラグ</li>
+</ul>
+</li>
+<li>full<ul>
+<li>フル GC を実行するかどうかのフラグ</li>
+</ul>
+</li>
+<li>generational<ul>
+<li>世代別 GC を実行するかどうかのフラグ</li>
+</ul>
+</li>
+<li>out_of_memory</li>
+<li>majorgc_old_threshold;</li>
+</ul>
+</li>
+<li>mrb_heap_page<ul>
+<li>prev</li>
+<li>next<ul>
+<li>ヒープのリストの、前のノードと後ろのノードへのポインタ</li>
+</ul>
+</li>
+<li>free_prev</li>
+<li>free_next<ul>
+<li>ヒープのフリーなリストの、前のノードと後ろのノードへのポインタ</li>
+</ul>
+</li>
+<li>old<ul>
+<li>そのページの世代を bool で示す</li>
+<li>true なら古い世代。 false なら若い世代(マイナー GC の対象)</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="internals">
+<h3>Internals<a class="headerlink" href="#internals" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id5">
+<h4>GC のエントリポイント<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_obj_alloc()<ul>
+<li>オブジェクトのためのメモリを割り当てる</li>
+<li>割り当て前に、現在生き残っているオブジェクトがしきい値を超えている場合は GC を動作させる</li>
+<li>free_heaps からオブジェクト用に freelist を割り付ける<ul>
+<li>もし free_heaps が無い場合は add_heap() を読んで継ぎ足す</li>
+</ul>
+</li>
+<li>paint_partial_white() を呼んでおく</li>
+</ul>
+</li>
+<li>incremental_gc_step()<ul>
+<li>インクリメンタル GC をステップ実行する</li>
+<li>step_ratio 係数をかけた</li>
+</ul>
+</li>
+<li>incremental_gc_until()<ul>
+<li>インクリメンタル GC を、指定した状態に遷移するまで実行する</li>
+</ul>
+</li>
+<li>incremental_gc()<ul>
+<li>インクリメンタル GC 処理の本体</li>
+<li>ROOT 状態の場合:<ul>
+<li>root をスキャンする</li>
+<li>次の状態を MARK にする</li>
+</ul>
+</li>
+<li>MARK 状態の場合:</li>
+<li>SWEEP 状態の場合:</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id6">
+<h4>スキャンフェーズ関連<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>root_scan_phase()<ul>
+<li>ROOT フェーズの処理</li>
+<li>sweep されるべきでない obj を片っ端から mark していく。これらが mark の root になる<ul>
+<li>irena_idx 以下の arena に格納されている obj</li>
+<li>Object クラス</li>
+<li>... などなど</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id7">
+<h4>マークフェーズ関連<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>incremental_marking_phase()<ul>
+<li>MARK フェーズの処理</li>
+</ul>
+</li>
+<li>add_gray_list()<ul>
+<li>引数の obj を gray に着色し、 gray_list に追加する</li>
+</ul>
+</li>
+<li>gc_gray_mark()<ul>
+<li>gc_mark_children() を呼び出してマークする</li>
+<li>個要素の数を取得して戻り値として返す</li>
+</ul>
+</li>
+<li>gc_mark_children()<ul>
+<li>引数の obj を black でマークする</li>
+<li>obj の型によっては、例えばクラスやオブジェクトだったらインスタンス変数を、 gray でマークする</li>
+</ul>
+</li>
+<li>gc_mark_gray_list()<ul>
+<li>gray_list を順番になめて、 gray になってなかったら gray にする</li>
+</ul>
+</li>
+<li>final_marking_phase()<ul>
+<li>マークフェーズの後処理を行う</li>
+<li>atomic_gray_list に格納された obj を再度マークする</li>
+</ul>
+</li>
+<li>prepare_incremental_sweep()<ul>
+<li>スイープフェーズの前処理を行う<ul>
+<li>フェーズ状態の変更やマーク・スイープに使用するリストのセット</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>clear_all_old()<ul>
+<li>世代別 GC を一旦無効化した上で GC サイクルを次のスキャンフェーズまで実行する</li>
+<li>こうすることで古い世代を若い世代として処理し直すことが可能になる</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id8">
+<h4>スイープフェーズ関連<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>incremental_sweep_phase()<ul>
+<li>sweeps リストを順番になめていく</li>
+<li>各 obj を obj_free() に突っ込んでゆき、 freelist に加えていく</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id9">
+<h4>アロケーション周り<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_realloc_simple()<ul>
+<li>アロケーション処理の根の部分</li>
+<li>mrb-&gt;allocf に割り当てを行ってもらう</li>
+<li>割り当てに失敗した場合にフル GC を実行して再挑戦する</li>
+</ul>
+</li>
+<li>mrb_realloc()<ul>
+<li>mrb_realloc_simple を呼んでメモリを割り当てる</li>
+<li>十分なメモリを割り当てられなかった場合は out_of_memory フラグを true にして例外を投げる</li>
+</ul>
+</li>
+<li>mrb_malloc()<ul>
+<li>mrb_realloc() を、割り当て済みポインタを nullptr にしているだけのラッパー</li>
+</ul>
+</li>
+<li>mrb_malloc_simple()<ul>
+<li>mrb_realloc_simple() を、割り当て済みポインタを nullptr にしているだけのラッパー</li>
+</ul>
+</li>
+<li>mrb_calloc()<ul>
+<li>nelem * len のサイズの領域を mrb_malloc() で割り当てる</li>
+<li>確保した領域はゼロクリアされる</li>
+</ul>
+</li>
+<li>mrb_free()<ul>
+<li>mrb-&gt;allocf を第三引数 0 で呼び出して free してもらう</li>
+</ul>
+</li>
+<li>mrb_object_dead_p()<ul>
+<li>引数で渡されたオブジェクトが死んでいる扱いであれば true を返す</li>
+<li>処理的には white でマークされていないか、型情報が FREE でないかをチェックしている</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id10">
+<h4>ヒープ管理周り<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>link_heap_page()<ul>
+<li>引数で渡された heap_page を、 heaps のリストに加える</li>
+</ul>
+</li>
+<li>unlink_heap_page()<ul>
+<li>引数で渡された heap_page を、 heaps のリストから外す</li>
+</ul>
+</li>
+<li>link_free_heap_page()<ul>
+<li>引数で渡された heap_page を、 free_heaps のリストに加える</li>
+</ul>
+</li>
+<li>unlink_free_heap_page()<ul>
+<li>引数で渡された heap_page を、 free_heaps のリストから外す</li>
+</ul>
+</li>
+<li>add_heap()<ul>
+<li>新しい heap_page を mrb_calloc で割り当てる</li>
+<li>割り当てが成功したなら、 heaps, free_heaps リストにそれを加える</li>
+</ul>
+</li>
+<li>free_heap()<ul>
+<li>heaps リストの各ページをチェックしていく</li>
+<li>obj_free() でデストラクタを呼び出していく</li>
+<li>mrb_free() で指定の heap_page を解放する</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="section" id="apis">
+<h2>APIs<a class="headerlink" href="#apis" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="c-apis">
+<h3>C APIs<a class="headerlink" href="#c-apis" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mrb_gc_arena_save() / mrb_gc_arena_restore()<ul>
+<li>Matz にっきを読もう: <a class="reference external" href="http://www.rubyist.net/~matz/20130731.html">http://www.rubyist.net/~matz/20130731.html</a></li>
+<li>簡単にまとめると下記のようなかんじ？<ol class="arabic">
+<li>C 実装内でオブジェクト生成したら GC 対象外になる</li>
+<li>ただし mrb_gc_arena_save() から mrb_gc_arena_restore() までに生成したオブジェクトは GC 対象になる</li>
+</ol>
+</li>
+</ul>
+</li>
+<li>mrb_gc_register() / mrb_gc_unregister() 周り<ul>
+<li>引数の mrb_value を GC root に登録/削除することで、 GC の対象外として登録/解除を行う</li>
+<li>mrb_gc_unregister(mrb, obj)<ul>
+<li>GC root 変数配列から、引数に渡された obj と同値のものを見つけて、配列から削除する</li>
+<li>削除はその値以外を memmove することで実現</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>mrb_full_gc()<ul>
+<li>フル GC を実行する</li>
+<li>古い世代も GC 対象に戻す</li>
+</ul>
+</li>
+<li>mrb_incremental_gc()<ul>
+<li>インクリメンタル GC を実行する</li>
+</ul>
+</li>
+<li>mrb_garbage_collect()<ul>
+<li>mrb_full_gc() のエイリアス</li>
+</ul>
+</li>
+<li>mrb_gc_mark()<ul>
+<li>引数に渡された RBasic 型の変数をマークする<ul>
+<li>実際の処理としては、 obj を gray_list に追加している</li>
+</ul>
+</li>
+<li>mrb_value を渡せる mrb_gc_mark_value() マクロも存在する</li>
+</ul>
+</li>
+<li>mrb_gc_protect()<ul>
+<li>arena のキャパを増やし、引数の mrb_value を arena の idx の領域に格納する</li>
+<li>指定の mrb_value を arena 内に格納して、（直近の GC から？）保護するイメージ</li>
+</ul>
+</li>
+<li>mrb_field_write_barrier(mrb_state *mrb, struct RBasic *obj, struct RBasic *value)<ul>
+<li>black な obj が参照する white な value に対してライトバリアを張る</li>
+<li>gray_list に value を追加する</li>
+</ul>
+</li>
+<li>mrb_write_barrier(mrb_state *mrb, struct RBasic *obj)<ul>
+<li>obj にライトバリアをはる</li>
+<li>obj を gray にマークした上で、 atomic_gray_list に追加する</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="mruby-apis">
+<h3>mruby APIs<a class="headerlink" href="#mruby-apis" title="Permalink to this headline">¶</a></h3>
+<p>mruby アプリケーションから GC の振る舞いに干渉するための Module 、 &#8220;GC&#8221; が提供されている</p>
+<ul class="simple">
+<li>GC#start<ul>
+<li>Full GC を実行する</li>
+</ul>
+</li>
+<li>GC#enable<ul>
+<li>GC を有効にする</li>
+</ul>
+</li>
+<li>GC#disable<ul>
+<li>GC を無効にする</li>
+</ul>
+</li>
+<li>GC#interval_ratio<ul>
+<li>interval_ratio を読み出す</li>
+</ul>
+</li>
+<li>GC#interval_ratio=<ul>
+<li>interval_ratio を更新する</li>
+</ul>
+</li>
+<li>GC#step_ratio<ul>
+<li>step_ratio を読み出す</li>
+</ul>
+</li>
+<li>GC#step_ratio=<ul>
+<li>step_ratio を更新する</li>
+</ul>
+</li>
+<li>GC#generational_mode<ul>
+<li>世代別 GC モードかどうかを返す</li>
+</ul>
+</li>
+<li>GC#generational_mode=<ul>
+<li>世代別 GC モードにするかどうかを設定する</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">GC</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#details">Details</a><ul>
+<li><a class="reference internal" href="#id1">インクリメンタル GC</a></li>
+<li><a class="reference internal" href="#id2">世代別 GC</a></li>
+<li><a class="reference internal" href="#id3">GC の実行タイミング</a></li>
+<li><a class="reference internal" href="#id4">GC 周りの基本構造</a></li>
+<li><a class="reference internal" href="#internals">Internals</a><ul>
+<li><a class="reference internal" href="#id5">GC のエントリポイント</a></li>
+<li><a class="reference internal" href="#id6">スキャンフェーズ関連</a></li>
+<li><a class="reference internal" href="#id7">マークフェーズ関連</a></li>
+<li><a class="reference internal" href="#id8">スイープフェーズ関連</a></li>
+<li><a class="reference internal" href="#id9">アロケーション周り</a></li>
+<li><a class="reference internal" href="#id10">ヒープ管理周り</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#apis">APIs</a><ul>
+<li><a class="reference internal" href="#c-apis">C APIs</a></li>
+<li><a class="reference internal" href="#mruby-apis">mruby APIs</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="functions.html" title="previous chapter">便利関数など</a></li>
+      <li>Next: <a href="khash.html" title="next chapter">khash</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/gc.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Ryo Okubo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/gc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

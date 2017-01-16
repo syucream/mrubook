@@ -1,0 +1,492 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>値と型 &#8212; mrubook 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="変数の扱い" href="variable.html" />
+    <link rel="prev" title="Proc" href="proc.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="id1">
+<h1>値と型<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="details">
+<h2>Details<a class="headerlink" href="#details" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="mrb-value">
+<h3>mrb_value<a class="headerlink" href="#mrb-value" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mruby で扱われる任意の値。</li>
+<li>設定依存で Boxing される<ul>
+<li>デフォルトでは boxing_no</li>
+<li>NaN Boxing や Word Boxing のオプションが提供される。使用する場合はそれらの制約に気をつける必要がある</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="rclass">
+<h3>RClass<a class="headerlink" href="#rclass" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mruby のクラス</li>
+<li>iv は Instance variable table 変数<ul>
+<li>セグメント(TODO: 定義をちゃんと調べる)ごとのサイズとルートセグメントへのポインタをもつ</li>
+</ul>
+</li>
+<li>mt<ul>
+<li>struct kh_mt はそのままの名前で定義されていないので注意！<ul>
+<li>kh_xxx は khash.h の KHASH_DECLARE マクロでプリプロセッサではじめて定義される</li>
+</ul>
+</li>
+<li>mt は mark table ? GC に使うっぽい？ TODO: gc.c とか読む</li>
+<li>khash は mruby の hash table のはず TODO: khash の詳細を追う</li>
+</ul>
+</li>
+<li>super<ul>
+<li>そのまんま、親クラスのポインタ</li>
+</ul>
+</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">struct</span> <span class="n">RClass</span> <span class="p">{</span>
+  <span class="n">MRB_OBJECT_HEADER</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">iv_tbl</span> \<span class="o">*</span><span class="n">iv</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">kh_mt</span> \<span class="o">*</span><span class="n">mt</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="nb">super</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="robject">
+<h3>RObject<a class="headerlink" href="#robject" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mruby のオブジェクト</li>
+<li>mrb_obj_ptr マクロで mrb_value から RObject へ変換できる</li>
+<li>下記のような定義になるはず<ul>
+<li>一部メンバは MRB_OBJECT_HEADER マクロで展開される</li>
+</ul>
+</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">struct</span> <span class="n">RObject</span> <span class="p">{</span>
+  <span class="o">//</span> <span class="n">MRB_OBJECT_HEADER</span>
+  <span class="n">enum</span> <span class="n">mrb_vtype</span> <span class="n">tt</span><span class="p">:</span><span class="mi">8</span>
+  <span class="n">uint32_t</span> <span class="n">color</span><span class="p">:</span><span class="mi">3</span><span class="p">;</span>
+  <span class="n">uint32_t</span> <span class="n">flags</span><span class="p">:</span><span class="mi">21</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">c</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">RBasic</span> \<span class="o">*</span><span class="n">gcnext</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">RClass</span> <span class="n">のみ</span>
+  <span class="n">struct</span> <span class="n">iv_tbl</span> \<span class="o">*</span><span class="n">iv</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li>struct RClass*<ul>
+<li>オブジェクトのクラスへのポインタ</li>
+<li>mrb_class() 関数では、引数の mrb_value が組み込みクラス以外であった場合にはこの値を返す</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="mrb-int">
+<h3>mrb_int<a class="headerlink" href="#mrb-int" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>整数型。サイズは環境依存</li>
+</ul>
+</div>
+<div class="section" id="mrb-float">
+<h3>mrb_float<a class="headerlink" href="#mrb-float" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>浮動小数点数型</li>
+<li>MRB_USE_FLOAT を define しない限りは実体は C の double 型になる</li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h3>mrb_value の型変換<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id3">
+<h4>別の型から mrb_value への変換<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h4>
+<p>mrb_int などから mrb_value 型表現へ変換する関数が存在</p>
+<ul class="simple">
+<li>mrb_float_value()</li>
+<li>mrb_fixnum_value()</li>
+<li>mrb_symbol_value()</li>
+<li>mrb_obj_value()</li>
+<li>mrb_nil_value()</li>
+<li>mrb_false_value()</li>
+<li>mrb_true_value()</li>
+<li>mrb_bool_value()</li>
+<li>mrb_undef_value()</li>
+</ul>
+</div>
+<div class="section" id="id4">
+<h4>mrb_value から別の型への変換<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_str_to_cstr()<ul>
+<li>char* へ変換</li>
+</ul>
+</li>
+<li>mrb_string_to_cstr()<ul>
+<li>const char* へ変換</li>
+<li>TODO: mrb_str_to_cstr() との違いを記述</li>
+</ul>
+</li>
+<li>mrb_class_ptr(v)<ul>
+<li>struct RClass* へ変換</li>
+</ul>
+</li>
+<li>mrb_obj_ptr() マクロ<ul>
+<li>RObject* へ変換</li>
+</ul>
+</li>
+<li>mrb_ary_ptr(v) / RARRAY(v)<ul>
+<li>struct RArray* へ変換</li>
+</ul>
+</li>
+<li>mrb_ptr() マクロ<ul>
+<li>void* へ変換</li>
+<li>Boxing は内部的に勝手に考慮する</li>
+</ul>
+</li>
+<li>mrb_cptr() マクロ<ul>
+<li>mrb_ptr() マクロのエイリアス</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="id5">
+<h3>mrb_value の型情報の確認<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="mrb-vtype">
+<h4>mrb_vtype()<a class="headerlink" href="#mrb-vtype" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_value の型情報(enum mrb_vtype) を返す</li>
+</ul>
+</div>
+<div class="section" id="id6">
+<h4>mrb_value の型チェック<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mruby のヘッダでいくつか型チェック用のマクロが用意されている<ul>
+<li>NaN Boxing されているかどうかも考慮してチェックする</li>
+</ul>
+</li>
+<li>mrb_fixnum_p(o)<ul>
+<li>o が Fixnum 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_undef_p(o)<ul>
+<li>o が Undef 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_nil_p(o)<ul>
+<li>o が Nil 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_bool(o)<ul>
+<li>o が True 型であれば true を返し、 False 型であれば false を返す</li>
+</ul>
+</li>
+<li>mrb_float_p(o)<ul>
+<li>o が Float 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_symbol_p(o)<ul>
+<li>o が Symbol 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_array_p(o)<ul>
+<li>o が Array 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_string_p(o)<ul>
+<li>o が String 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_hash_p(o)<ul>
+<li>o が Hash 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_cptr_p(o)<ul>
+<li>o が Cptr 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_exception_p(o)<ul>
+<li>o が Exception 型であれば true を返す</li>
+</ul>
+</li>
+<li>mrb_test(o)<ul>
+<li>mrb_bool(o) のエイリアス</li>
+</ul>
+</li>
+<li>mrb_regexp_p<ul>
+<li>第二引数の mrb_value が Regexp 型であれば true を返す</li>
+<li>これはマクロではなく C の関数</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="mruby">
+<h3>mruby スクリプトでも使う型<a class="headerlink" href="#mruby" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>合計 23 個の型が存在する</li>
+<li>MRB_TT_FALSE<ul>
+<li>真偽値。 false を表す</li>
+</ul>
+</li>
+<li>MRB_TT_FREE<ul>
+<li>???</li>
+</ul>
+</li>
+<li>MRB_TT_TRUE<ul>
+<li>真偽値。 true を表す</li>
+</ul>
+</li>
+<li>MRB_TT_FIXNUM<ul>
+<li>整数型</li>
+</ul>
+</li>
+</ul>
+<p>...</p>
+<ul class="simple">
+<li>MRB_TT_OBJECT<ul>
+<li>オブジェクト型</li>
+<li>TODO: 詳細は別途調べる</li>
+</ul>
+</li>
+<li>MRB_TT_CLASS<ul>
+<li>クラス型</li>
+<li>TODO: 詳細は別途調べる</li>
+</ul>
+</li>
+<li>MRB_TT_SCLASS<ul>
+<li>シングルトンクラス型</li>
+</ul>
+</li>
+</ul>
+<p>...</p>
+</div>
+<div class="section" id="nan-boxing">
+<h3>NaN Boxing<a class="headerlink" href="#nan-boxing" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>boxing_nan で使われているテクニックについて</li>
+<li>mruby に限ったテクニックではない。 LuaJIT などで実現されているらしい</li>
+<li><a class="reference external" href="http://constellation.hatenablog.com/entry/20110910/1315586703">http://constellation.hatenablog.com/entry/20110910/1315586703</a> などが参考になる<ul>
+<li>恥ずかしながら double のフォーマットをこれを読んで初めて知った</li>
+</ul>
+</li>
+</ul>
+<div class="section" id="id7">
+<h4>NaN Boxing とは<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>前提として、 double 型は NaN の表現に使用しているビット幅が冗長</li>
+<li>一部分を横取りして、少ないビット数で他の変数の値と型の情報を埋め込むテクニックが Nan Boxing</li>
+<li>mruby の実装では 64 ビットで変数の型情報まで保持させることができる<ul>
+<li>とは言っても制約がある</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id8">
+<h4>変数表現<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h4>
+<p>64 ビットの範囲で、下記のように表現される。ちゃんと日本語化すると以下の通り</p>
+<ul class="simple">
+<li>float<ul>
+<li>double 型の NaN 領域と同じ扱いのはず？</li>
+</ul>
+</li>
+<li>object<ul>
+<li>上位 12 ビット: 1 で埋められる</li>
+<li>中位  6 ビット: オブジェクトの詳細な型の情報になる</li>
+<li>下位 46 ビット: オブジェクトの実際の値 ... のポインタ値になる</li>
+</ul>
+</li>
+<li>int<ul>
+<li>上位 16 ビット: 1111111111110001</li>
+<li>中位 16 ビット: 0000000000000000</li>
+<li>下位 32 ビット: int の実際の値</li>
+</ul>
+</li>
+<li>sym(シンボル)<ul>
+<li>上位 16 ビット: 1111111111110001</li>
+<li>中位 16 ビット: 0100000000000000</li>
+<li>下位 32 ビット: sym の実際の値</li>
+</ul>
+</li>
+</ul>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nb">float</span> <span class="p">:</span> <span class="n">FFFFFFFFFFFFFFFF</span> <span class="n">FFFFFFFFFFFFFFFF</span> <span class="n">FFFFFFFFFFFFFFFF</span> <span class="n">FFFFFFFFFFFFFFFF</span>
+<span class="nb">object</span><span class="p">:</span> <span class="mi">111111111111</span><span class="n">TTTT</span> <span class="n">TTPPPPPPPPPPPPPP</span> <span class="n">PPPPPPPPPPPPPPPP</span> <span class="n">PPPPPPPPPPPPPPPP</span>
+<span class="nb">int</span>   <span class="p">:</span> <span class="mi">1111111111110001</span> <span class="mi">0000000000000000</span> <span class="n">IIIIIIIIIIIIIIII</span> <span class="n">IIIIIIIIIIIIIIII</span>
+<span class="n">sym</span>   <span class="p">:</span> <span class="mi">1111111111110001</span> <span class="mi">0100000000000000</span> <span class="n">SSSSSSSSSSSSSSSS</span> <span class="n">SSSSSSSSSSSSSSSS</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li>C の構造体では下記のように定義される</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">typedef</span> <span class="n">struct</span> <span class="n">mrb_value</span> <span class="p">{</span>
+  <span class="n">union</span> <span class="p">{</span>
+    <span class="n">mrb_float</span> <span class="n">f</span><span class="p">;</span>
+    <span class="n">union</span> <span class="p">{</span>
+      <span class="n">void</span> <span class="o">*</span><span class="n">p</span><span class="p">;</span>
+      <span class="n">struct</span> <span class="p">{</span>
+        <span class="n">MRB_ENDIAN_LOHI</span><span class="p">(</span>
+          <span class="n">uint32_t</span> <span class="n">ttt</span><span class="p">;</span>
+          <span class="p">,</span><span class="n">union</span> <span class="p">{</span>
+            <span class="n">mrb_int</span> <span class="n">i</span><span class="p">;</span>
+            <span class="n">mrb_sym</span> <span class="n">sym</span><span class="p">;</span>
+          <span class="p">};</span>
+        <span class="p">)</span>
+      <span class="p">};</span>
+    <span class="p">}</span> <span class="n">value</span><span class="p">;</span>
+  <span class="p">};</span>
+<span class="p">}</span> <span class="n">mrb_value</span><span class="p">;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li>object の 6 ビットの型情報だけど、 mruby の型は 23 種類存在する（mrb_vtype の定義を参考）ので、これが収まるサイズにした感じか</li>
+</ul>
+</div>
+<div class="section" id="id9">
+<h4>NaN Boxing しない世界<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>つまり NaN Boxing 、あるいは Word Boxing を有効にしない場合<ul>
+<li>多くのユーザはこれにあたるはず</li>
+</ul>
+</li>
+<li>C の構造体では下記のように定義される<ul>
+<li>float, object(ポインタ), int, sym(シンボル) は一緒くたに union で宣言される</li>
+<li>型情報(tt) はそれとは別にもつ。ので環境によっては mrb_value のサイズは 64 ビット以上になる</li>
+</ul>
+</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">typedef</span> <span class="n">struct</span> <span class="n">mrb_value</span> <span class="p">{</span>
+  <span class="n">union</span> <span class="p">{</span>
+    <span class="n">mrb_float</span> <span class="n">f</span><span class="p">;</span>
+    <span class="n">void</span> <span class="o">*</span><span class="n">p</span><span class="p">;</span>
+    <span class="n">mrb_int</span> <span class="n">i</span><span class="p">;</span>
+    <span class="n">mrb_sym</span> <span class="n">sym</span><span class="p">;</span>
+  <span class="p">}</span> <span class="n">value</span><span class="p">;</span>
+  <span class="n">enum</span> <span class="n">mrb_vtype</span> <span class="n">tt</span><span class="p">;</span>
+<span class="p">}</span> <span class="n">mrb_value</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">値と型</a><ul>
+<li><a class="reference internal" href="#details">Details</a><ul>
+<li><a class="reference internal" href="#mrb-value">mrb_value</a></li>
+<li><a class="reference internal" href="#rclass">RClass</a></li>
+<li><a class="reference internal" href="#robject">RObject</a></li>
+<li><a class="reference internal" href="#mrb-int">mrb_int</a></li>
+<li><a class="reference internal" href="#mrb-float">mrb_float</a></li>
+<li><a class="reference internal" href="#id2">mrb_value の型変換</a><ul>
+<li><a class="reference internal" href="#id3">別の型から mrb_value への変換</a></li>
+<li><a class="reference internal" href="#id4">mrb_value から別の型への変換</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id5">mrb_value の型情報の確認</a><ul>
+<li><a class="reference internal" href="#mrb-vtype">mrb_vtype()</a></li>
+<li><a class="reference internal" href="#id6">mrb_value の型チェック</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#mruby">mruby スクリプトでも使う型</a></li>
+<li><a class="reference internal" href="#nan-boxing">NaN Boxing</a><ul>
+<li><a class="reference internal" href="#id7">NaN Boxing とは</a></li>
+<li><a class="reference internal" href="#id8">変数表現</a></li>
+<li><a class="reference internal" href="#id9">NaN Boxing しない世界</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="proc.html" title="previous chapter">Proc</a></li>
+      <li>Next: <a href="variable.html" title="next chapter">変数の扱い</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/types.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Ryo Okubo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/types.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

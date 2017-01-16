@@ -1,0 +1,628 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>mruby Virtual Machine(RiteVM) &#8212; mrubook 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="変数の扱い" href="variable.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="mruby-virtual-machine-ritevm">
+<h1>mruby Virtual Machine(RiteVM)<a class="headerlink" href="#mruby-virtual-machine-ritevm" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><a class="reference external" href="http://www.dzeta.jp/~junjis/code_reading/index.php?mruby%2F%A5%B3%A1%BC%A5%C9%BC%C2%B9%D4%A4%F2%C6%C9%A4%E0">http://www.dzeta.jp/~junjis/code_reading/index.php?mruby%2F%A5%B3%A1%BC%A5%C9%BC%C2%B9%D4%A4%F2%C6%C9%A4%E0</a> とか参考になりそう。</li>
+</ul>
+</div>
+<div class="section" id="details">
+<h2>Details<a class="headerlink" href="#details" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>レジスタマシンのようだ</li>
+<li>レジスタは mrb_context で保持する stack に積んであるようだ<ul>
+<li>mrb_vm_exec() では regs マクロでレジスタを取り出す</li>
+</ul>
+</li>
+<li>TODO: どのくらいの種類のレジスタがあるのか確認</li>
+</ul>
+<div class="section" id="ritevm">
+<h3>RiteVM の機械語<a class="headerlink" href="#ritevm" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mrb_code (uint32_t の typedef) で表現される</li>
+</ul>
+</div>
+<div class="section" id="id1">
+<h3>オペランド<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>0 個以上 3 個以下とる</li>
+<li>オペランドについては A, B, C という名前になる</li>
+<li>オペランド修飾子<ul>
+<li>なにも付かない場合: 9 ビットサイズになる</li>
+<li>オペランドの前にs: signed, 符号付き</li>
+<li>オペランドの後ろに x: (25 - 他のオペランドサイズ)の値になる</li>
+<li>オペランドの後ろに z: よーわからん</li>
+</ul>
+</li>
+<li>めも: 9 ビットとかってなんだろう？どこか符号ビットにしているのか？</li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h3>オペコード<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>0 個以上 3 個以下のオペランドをとる</li>
+<li>mruby/opecode.h に enum で定義されている<ul>
+<li>各オペコードに対応する VM における処理は vm.c の mrb_vm_exec() を読むこと</li>
+</ul>
+</li>
+</ul>
+<div class="section" id="id3">
+<h4>特殊<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>OP_NOP<ul>
+<li>なにもしない</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id4">
+<h4>ロード系<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>OP_MOVE A B<ul>
+<li>B を A にコピーする</li>
+</ul>
+</li>
+<li>OP_LOADL A Bx<ul>
+<li>Bx のプールの値を A にコピーする????</li>
+</ul>
+</li>
+<li>OP_LOADI A sBx<ul>
+<li>I は Int?</li>
+<li>sBx の値を Int 型とみなして A にコピーする???</li>
+</ul>
+</li>
+<li>OP_LOADSYM A Bx<ul>
+<li>SYM は symbol のはず</li>
+<li>Bx の値を Symbol 型とみなして A にコピーする???</li>
+</ul>
+</li>
+<li>OP_LOADNIL A<ul>
+<li>A に nil をコピーする</li>
+</ul>
+</li>
+<li>OP_LOADSELF A<ul>
+<li>A に self をコピーする</li>
+<li>self は regs[0] に相当する</li>
+</ul>
+</li>
+<li>OP_LOADT A<ul>
+<li>A に true をコピーする</li>
+</ul>
+</li>
+<li>OP_LOADF A<ul>
+<li>A に false をコピーする</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id5">
+<h4>制御系<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>OP_JMP sBx<ul>
+<li>sBx へ jump する</li>
+<li>pc を sBx の値に書き換えて break (JUMP マクロ)</li>
+</ul>
+</li>
+<li>OP_JMPIF A sBx<ul>
+<li>もし A の値が true なら sBx へ jump する</li>
+<li>A の評価には mrb_test マクロを使う</li>
+</ul>
+</li>
+<li>OP_JMPNOT A sBx<ul>
+<li>OP_JMPIF の逆バージョン</li>
+<li>A の値が false なら sBx へ jump する</li>
+</ul>
+</li>
+</ul>
+<p>...</p>
+</div>
+</div>
+<div class="section" id="mrb-irep-instruction-or-intermediate-representation">
+<h3>mrb_irep (instruction or intermediate representation の略？)<a class="headerlink" href="#mrb-irep-instruction-or-intermediate-representation" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>ローカル変数<ul>
+<li>nlocals にローカル変数の数が格納される</li>
+<li>16 ビットに収まる範囲であればローカル変数保持できるのか？</li>
+</ul>
+</li>
+<li>レジスタ<ul>
+<li>nregs にレジスタ数が格納される</li>
+<li>16 ビットに(ry</li>
+</ul>
+</li>
+<li>フラグ<ul>
+<li>irep の解釈の仕方を制御するフラグ</li>
+<li>FLAG_BYTEORDER_BIG<ul>
+<li>ビッグエンディアンフラグ</li>
+<li>bin_to_uint32() でビッグエンディアンとして iseq を解釈</li>
+</ul>
+</li>
+<li>FLAG_BYTEORDER_LIL<ul>
+<li>リトルエンディアンフラグ</li>
+<li>bin_to_uint32l() でリトルエンディアンとして iseq を解釈</li>
+</ul>
+</li>
+<li>FLAG_BYTEORDER_NATIVE<ul>
+<li>ネイティブのエンディアンに従うフラグ</li>
+<li>memcpy で iseq を一気にコピー</li>
+</ul>
+</li>
+<li>FLAG_SRC_MALLOC<ul>
+<li>バイトコード読み出しの際に mrb_malloc した領域に解釈した内容をコピーする</li>
+</ul>
+</li>
+<li>FLAG_SRC_STATIC<ul>
+<li>バイトコード読み出しの際にコピーせず、元のバイトコードへのポインタを保持する</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>iseq<ul>
+<li>コードセグメント（実体は mrb_code の配列）の先頭番地へのポインタ</li>
+<li>RiteVM に処理させたい際は、 iseq を pc に突っ込んで開始する</li>
+</ul>
+</li>
+<li>pool</li>
+<li>syms<ul>
+<li>mrb_sym の配列</li>
+</ul>
+</li>
+<li>reps<ul>
+<li>続きの？ mrb_irep のリスト</li>
+</ul>
+</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">typedef</span> <span class="n">struct</span> <span class="n">mrb_irep</span> <span class="p">{</span>
+  <span class="n">uint16_t</span> <span class="n">nlocals</span><span class="p">;</span>
+  <span class="n">uint16_t</span> <span class="n">nregs</span><span class="p">;</span>
+  <span class="n">uint8_t</span> <span class="n">flags</span><span class="p">;</span>
+
+  <span class="n">mrb_code</span> \<span class="o">*</span><span class="n">iseq</span><span class="p">;</span>
+  <span class="n">mrb_value</span> \<span class="o">*</span><span class="n">pool</span><span class="p">;</span>
+  <span class="n">mrb_sym</span> \<span class="o">*</span><span class="n">syms</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">mrb_irep</span> \<span class="o">*</span>\<span class="o">*</span><span class="n">reps</span><span class="p">;</span>
+
+  <span class="n">struct</span> <span class="n">mrb_locals</span> \<span class="o">*</span><span class="n">lv</span><span class="p">;</span>
+
+  <span class="n">const</span> <span class="n">char</span> \<span class="o">*</span><span class="n">filename</span><span class="p">;</span>
+  <span class="n">uint16_t</span> \<span class="o">*</span><span class="n">lines</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">mrb_irep_debug_info</span>\<span class="o">*</span> <span class="n">debug_info</span><span class="p">;</span>
+
+  <span class="n">size_t</span> <span class="n">ilen</span><span class="p">,</span> <span class="n">plen</span><span class="p">,</span> <span class="n">slen</span><span class="p">,</span> <span class="n">rlen</span><span class="p">,</span> <span class="n">refcnt</span><span class="p">;</span>
+<span class="p">}</span> <span class="n">mrb_irep</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mruby">
+<h3>mruby 実行形式<a class="headerlink" href="#mruby" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mruby コマンドってやつ。コンパイル前のスクリプト .rb 、もしくはコンパイル済バイトコード .mrb を実行する<ul>
+<li>mrbgems/mruby-bin-mruby/ にコードあり</li>
+</ul>
+</li>
+<li>mrb_load_irep_file_cxt() などを読んでバイトコードを読み込み、実行<ul>
+<li>実行処理は mrb_top_run() を呼ぶことで行う</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id6">
+<h3>mruby コアデータ構造<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>RiteVM の実行状態や実行対象の手続きに関していくつものデータ構造が存在する</li>
+</ul>
+<div class="section" id="mrb-state">
+<h4>mrb_state<a class="headerlink" href="#mrb-state" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><a class="reference external" href="http://qiita.com/miura1729/items/822a18051e8a97244dc3">http://qiita.com/miura1729/items/822a18051e8a97244dc3</a> が参考になりそう。</li>
+<li>C で mrbgem を実装しようとするとちらほら目にする構造体</li>
+<li>mruby の VM の状態を保持</li>
+<li>各基本クラスへのポインタやGC情報、グローバル変数などを格納する</li>
+<li>RiteVM の実行コンテキストをもつ</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">struct</span> <span class="n">mrb_context</span> \<span class="o">*</span><span class="n">c</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">mrb_context</span> \<span class="o">*</span><span class="n">root_c</span><span class="p">;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li>mruby 組み込みクラスの定義へのポインタを持つ<ul>
+<li>これらはほぼ全て（全部じゃないよね？） init された後は書き換わることは無い</li>
+<li>string.c とか init 関数毎に代入箇所が散らばっているので注意！</li>
+</ul>
+</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">object_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">class_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">module_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">proc_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">string_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">array_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">hash_class</span><span class="p">;</span>
+
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">float_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">fixnum_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">true_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">false_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">nil_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">symbol_class</span><span class="p">;</span>
+<span class="n">struct</span> <span class="n">RClass</span> \<span class="o">*</span><span class="n">kernel_module</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mrb-context">
+<h4>mrb_context<a class="headerlink" href="#mrb-context" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>prev<ul>
+<li>以前のコンテキスト</li>
+<li>例えば Fiber における親 fiber のコンテキスト</li>
+<li>例えば ... ほかにある？</li>
+</ul>
+</li>
+<li>...</li>
+<li>status<ul>
+<li>そのコンテキストの持ち主となる fiber の実行状態</li>
+<li>詳しくは Fiber の項目を参考</li>
+</ul>
+</li>
+<li>fib<ul>
+<li>そのコンテキストの持ち主となる fiber へのポインタ</li>
+<li>そもそも fiber で実行していない場合...どうなる？ NULL ？</li>
+</ul>
+</li>
+</ul>
+<div class="code c highlight-default"><div class="highlight"><pre><span></span><span class="n">struct</span> <span class="n">mrb_context</span> <span class="p">{</span>
+  <span class="n">struct</span> <span class="n">mrb_context</span> \<span class="o">*</span><span class="n">prev</span><span class="p">;</span>
+
+  <span class="n">mrb_value</span> \<span class="o">*</span><span class="n">stack</span><span class="p">;</span>
+  <span class="n">mrb_value</span> \<span class="o">*</span><span class="n">stbase</span><span class="p">,</span> \<span class="o">*</span><span class="n">stend</span><span class="p">;</span>
+
+  <span class="n">mrb_callinfo</span> \<span class="o">*</span><span class="n">ci</span><span class="p">;</span>
+  <span class="n">mrb_callinfo</span> \<span class="o">*</span><span class="n">cibase</span><span class="p">,</span> \<span class="o">*</span><span class="n">ciend</span><span class="p">;</span>
+
+  <span class="n">mrb_code</span> \<span class="o">*</span>\<span class="o">*</span><span class="n">rescue</span><span class="p">;</span>
+  <span class="nb">int</span> <span class="n">rsize</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">RProc</span> \<span class="o">*</span>\<span class="o">*</span><span class="n">ensure</span><span class="p">;</span>
+  <span class="nb">int</span> <span class="n">esize</span><span class="p">;</span>
+
+  <span class="n">enum</span> <span class="n">mrb_fiber_state</span> <span class="n">status</span><span class="p">;</span>
+  <span class="n">mrb_bool</span> <span class="n">vmexec</span><span class="p">;</span>
+  <span class="n">struct</span> <span class="n">RFiber</span> \<span class="o">*</span><span class="n">fib</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mrb-callinfo">
+<h4>mrb_callinfo<a class="headerlink" href="#mrb-callinfo" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>メソッド呼び出しに関する情報を保持？</li>
+<li>与えられた引数の数など</li>
+</ul>
+</div>
+<div class="section" id="rproc">
+<h4>RProc<a class="headerlink" href="#rproc" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mruby の Proc オブジェクト型</li>
+<li>このオブジェクトを VM で実行して mruby で処理を行うイメージ</li>
+</ul>
+</div>
+<div class="section" id="read-irep">
+<h4>read_irep()<a class="headerlink" href="#read-irep" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>バイトコードを読み出して、 mrb_irep の形式に当てはめる<ul>
+<li>まず read_binary_header() でヘッダを読み出す</li>
+<li>次の処理は各セクションを探して read_section_*() 関数で irep に変換していく</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="read-section-irep">
+<h4>read_section_irep()<a class="headerlink" href="#read-section-irep" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>irep セクションを読み出す<ul>
+<li>mrb_irep のうち重要なメンバが読み出される</li>
+<li>irep セクションは必須のものになる。あとはオプションのはず</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="read-section-lineno">
+<h4>read_section_lineno()<a class="headerlink" href="#read-section-lineno" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>lineno セクションを読み出す<ul>
+<li>mrb_irep のうち filename, lines が読み出される</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="read-section-debug">
+<h4>read_section_debug()<a class="headerlink" href="#read-section-debug" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>debug セクションを読み出す<ul>
+<li>mrb_irep のうち debug_info が読み出される</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="read-section-lv">
+<h4>read_section_lv()<a class="headerlink" href="#read-section-lv" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>lv セクションを読み出す<ul>
+<li>mrb_irep のうち lv が読み出される</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id7">
+<h4>RiteVM バイトコードフォーマット<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>irep として解釈するバイトコードは下記のようなフォーマットになってる？</li>
+</ul>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">+---------------------+</span>
+<span class="o">|</span> <span class="n">binary</span> <span class="n">header</span>       <span class="o">|</span>
+<span class="o">+---------------------+</span>
+<span class="o">|</span> <span class="n">irep</span> <span class="n">section</span> <span class="n">header</span> <span class="o">|</span>
+<span class="o">+---------------------+</span>
+<span class="o">|</span> <span class="n">irep</span> <span class="n">section</span> <span class="n">body</span>   <span class="o">|</span>
+<span class="o">+---------------------+</span>
+<span class="o">|</span> <span class="nb">any</span><span class="o">*</span> <span class="n">section</span> <span class="n">header</span> <span class="o">|</span>
+<span class="o">+---------------------+</span>
+<span class="o">|</span> <span class="nb">any</span><span class="o">*</span> <span class="n">section</span> <span class="n">body</span>   <span class="o">|</span>
+<span class="o">+---------------------+</span>
+<span class="o">*</span><span class="p">:</span> <span class="n">irep</span><span class="p">,</span> <span class="n">lineno</span><span class="p">,</span> <span class="n">debug</span> <span class="ow">or</span> <span class="n">lv</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id8">
+<h4>RiteVM バイトコードのヘッダ<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>rite_binary_header 構造体で表現される</li>
+<li>フォーマットは下記の通り:<ul>
+<li>4 バイト: バイナリ ID。基本的に &#8220;RITE&#8221; という 4 文字が書かれる</li>
+<li>4 バイト: バイナリバージョン。本文書の執筆段階では &#8220;0003&#8221;</li>
+<li>2 バイト: バイナリの CRC</li>
+<li>4 バイト: バイナリサイズ</li>
+<li>4 バイト: コンパイラ名。 mrbc でビルドした場合は &#8220;MATZ&#8221;</li>
+<li>4 バイト: コンパイラバージョン</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="section" id="apis">
+<h2>APIs<a class="headerlink" href="#apis" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id9">
+<h3>スクリプトの実行<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="mrb-run">
+<h4>mrb_run()<a class="headerlink" href="#mrb-run" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>渡された mrb_state 上で RProc を実行する</li>
+<li>実際には mrb_vm_run() を呼んでいるだけ</li>
+</ul>
+</div>
+<div class="section" id="mrb-top-run">
+<h4>mrb_top_run()<a class="headerlink" href="#mrb-top-run" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>渡された mrb_state 上で RProc を実行する</li>
+<li>mrb_run() より色々前準備をする場合がある<ul>
+<li>が、いまいちよくわからん。あとでよむ</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="mrb-vm-run">
+<h4>mrb_vm_run()<a class="headerlink" href="#mrb-vm-run" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>stack_extend() でレジスタの置き場所をスタック上に（必要な領域になるように）作ってる？</li>
+<li>スタックに積んだレジスタ R0 (って呼ぶべきなのか？) に self を格納しておく</li>
+<li>mrb_vm_exec() を読んで VM のメインループ開始<ul>
+<li>最初の処理開始位置である引数の pc に irep-&gt;iseq を渡している TODO: irep について読む</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="mrb-vm-exec">
+<h4>mrb_vm_exec()<a class="headerlink" href="#mrb-vm-exec" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>INIT_DISPATCH マクロ<ul>
+<li>pc, プログラムカウンタから次に解釈すべき命令を fetch する</li>
+<li>CODE_FETCH_HOOK マクロを実行。なにこれ？</li>
+<li>switch 文でオペコード毎の処理に分岐</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="id10">
+<h3>スクリプトの実行<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="mrb-value-mrb-load-irep-cxt-mrb-state-const-uint8-t-mrbc-context">
+<h4>mrb_value mrb_load_irep_cxt(mrb_state*, const uint8_t*, mrbc_context*)<a class="headerlink" href="#mrb-value-mrb-load-irep-cxt-mrb-state-const-uint8-t-mrbc-context" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>バイトコードを読み、 irep に変換して実行する<ul>
+<li>mrb_read_irep() でバイトコードから irep を生成する</li>
+<li>生成した irep から RProc を生成する</li>
+<li>実行処理は mrb_top_run() を呼び出すことで行う</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="mrb-value-mrb-load-irep-mrb-state-const-uint8-t">
+<h4>mrb_value mrb_load_irep(mrb_state*, const uint8_t*)<a class="headerlink" href="#mrb-value-mrb-load-irep-mrb-state-const-uint8-t" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_load_irep_cxt() を第三引数 NULL で呼び出す</li>
+</ul>
+</div>
+</div>
+<div class="section" id="id11">
+<h3>ダンプ<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="int-mrb-dump-irep-mrb-state-mrb-mrb-irep-irep-uint8-t-flags-uint8-t-bin-size-t-bin-size">
+<h4>int mrb_dump_irep(mrb_state *mrb, mrb_irep *irep, uint8_t flags, uint8_t **bin, size_t *bin_size)<a class="headerlink" href="#int-mrb-dump-irep-mrb-state-mrb-mrb-irep-irep-uint8-t-flags-uint8-t-bin-size-t-bin-size" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_irep をバイトコードに dump する<ul>
+<li>第 2 引数に dump 対象の mrb_irep を指定する</li>
+<li>第 3 引数は dump 結果のフォーマットを指定<ul>
+<li>DUMP_DEBUG_INFO: デバッグ情報を出力する</li>
+<li>DUMP_ENDIAN_BIG: ビッグエンディアンで出力</li>
+<li>DUMP_ENDIAN_LIL: リトルエンディアンで出力</li>
+<li>DUMP_ENDIAN_NAT: ネイティブのエンディアンで出力</li>
+<li>DUMP_ENDIAN_MASK: 上記 3 フラグを取り出す際のビットマスク</li>
+</ul>
+</li>
+<li>第 4,5 引数に dump 結果のバイトコードがセットされる。これらは内部的に mrb_malloc() で領域確保がされる</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">mruby Virtual Machine(RiteVM)</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#details">Details</a><ul>
+<li><a class="reference internal" href="#ritevm">RiteVM の機械語</a></li>
+<li><a class="reference internal" href="#id1">オペランド</a></li>
+<li><a class="reference internal" href="#id2">オペコード</a><ul>
+<li><a class="reference internal" href="#id3">特殊</a></li>
+<li><a class="reference internal" href="#id4">ロード系</a></li>
+<li><a class="reference internal" href="#id5">制御系</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#mrb-irep-instruction-or-intermediate-representation">mrb_irep (instruction or intermediate representation の略？)</a></li>
+<li><a class="reference internal" href="#mruby">mruby 実行形式</a></li>
+<li><a class="reference internal" href="#id6">mruby コアデータ構造</a><ul>
+<li><a class="reference internal" href="#mrb-state">mrb_state</a></li>
+<li><a class="reference internal" href="#mrb-context">mrb_context</a></li>
+<li><a class="reference internal" href="#mrb-callinfo">mrb_callinfo</a></li>
+<li><a class="reference internal" href="#rproc">RProc</a></li>
+<li><a class="reference internal" href="#read-irep">read_irep()</a></li>
+<li><a class="reference internal" href="#read-section-irep">read_section_irep()</a></li>
+<li><a class="reference internal" href="#read-section-lineno">read_section_lineno()</a></li>
+<li><a class="reference internal" href="#read-section-debug">read_section_debug()</a></li>
+<li><a class="reference internal" href="#read-section-lv">read_section_lv()</a></li>
+<li><a class="reference internal" href="#id7">RiteVM バイトコードフォーマット</a></li>
+<li><a class="reference internal" href="#id8">RiteVM バイトコードのヘッダ</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#apis">APIs</a><ul>
+<li><a class="reference internal" href="#id9">スクリプトの実行</a><ul>
+<li><a class="reference internal" href="#mrb-run">mrb_run()</a></li>
+<li><a class="reference internal" href="#mrb-top-run">mrb_top_run()</a></li>
+<li><a class="reference internal" href="#mrb-vm-run">mrb_vm_run()</a></li>
+<li><a class="reference internal" href="#mrb-vm-exec">mrb_vm_exec()</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id10">スクリプトの実行</a><ul>
+<li><a class="reference internal" href="#mrb-value-mrb-load-irep-cxt-mrb-state-const-uint8-t-mrbc-context">mrb_value mrb_load_irep_cxt(mrb_state*, const uint8_t*, mrbc_context*)</a></li>
+<li><a class="reference internal" href="#mrb-value-mrb-load-irep-mrb-state-const-uint8-t">mrb_value mrb_load_irep(mrb_state*, const uint8_t*)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id11">ダンプ</a><ul>
+<li><a class="reference internal" href="#int-mrb-dump-irep-mrb-state-mrb-mrb-irep-irep-uint8-t-flags-uint8-t-bin-size-t-bin-size">int mrb_dump_irep(mrb_state *mrb, mrb_irep *irep, uint8_t flags, uint8_t **bin, size_t *bin_size)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="variable.html" title="previous chapter">変数の扱い</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/vm.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Ryo Okubo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/vm.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

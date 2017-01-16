@@ -1,0 +1,288 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>便利関数など &#8212; mrubook 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="GC" href="gc.html" />
+    <link rel="prev" title="Fiber" href="fiber.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="id1">
+<h1>便利関数など<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><cite>include/</cite> 以下に宣言されているのいろいろ</li>
+</ul>
+</div>
+<div class="section" id="details">
+<h2>Details<a class="headerlink" href="#details" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id2">
+<h3>定義する系<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="struct-rclass-mrb-define-class-mrb-state-mrb-const-char-name-struct-rclass-super">
+<h4>struct RClass *mrb_define_class(mrb_state *mrb, const char *name, struct RClass *super)<a class="headerlink" href="#struct-rclass-mrb-define-class-mrb-state-mrb-const-char-name-struct-rclass-super" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>新しいクラスを定義します</li>
+</ul>
+</div>
+<div class="section" id="struct-rclass-mrb-define-module-mrb-state-const-char">
+<h4>struct RClass *mrb_define_module(mrb_state *, const char*)<a class="headerlink" href="#struct-rclass-mrb-define-module-mrb-state-const-char" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>新しいモジュールを定義します</li>
+</ul>
+</div>
+<div class="section" id="void-mrb-define-class-method-mrb-state-struct-rclass-const-char-mrb-func-t-mrb-aspec">
+<h4>void mrb_define_class_method(mrb_state *, struct RClass *, const char *, mrb_func_t, mrb_aspec)<a class="headerlink" href="#void-mrb-define-class-method-mrb-state-struct-rclass-const-char-mrb-func-t-mrb-aspec" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>新しくクラスメソッドを定義します<ul>
+<li>第 2 引数が追加する先のクラスになります</li>
+<li>第 4 引数にクラスメソッドの定義にあたる関数ポインタを渡します</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id3">
+<h4>クラス・モジュール関係<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_singleton_class()</li>
+<li>mrb_include_module()</li>
+<li>mrb_prepend_module()</li>
+<li>mrb_define_method()</li>
+<li>mrb_define_singleton_method()</li>
+<li>mrb_define_module_function()</li>
+</ul>
+<p>定義を削除することもできます</p>
+<ul class="simple">
+<li>mrb_undef_method()</li>
+<li>mrb_undef_class_method()</li>
+</ul>
+<p>定義の構造も柔軟に設定可能です</p>
+<ul class="simple">
+<li>mrb_define_class_under()</li>
+<li>mrb_define_module_under()</li>
+</ul>
+</div>
+<div class="section" id="id4">
+<h4>定数・変数系関係<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_define_const()</li>
+</ul>
+</div>
+<div class="section" id="id5">
+<h4>メソッドの引数定義<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h4>
+<p>便利マクロがいくつか。 <cite>mrb_define_method()</cite> などの第三引数の指定などに使います。</p>
+<ul class="simple">
+<li>MRB_ARGS_REQ(n)<ul>
+<li>n の数だけ引数を必須とします</li>
+</ul>
+</li>
+<li>MRB_ARGS_OPT(n)<ul>
+<li>n の数だけ引数を任意とします</li>
+</ul>
+</li>
+<li>MRB_ARGS_ARG(n1,n2)<ul>
+<li>n1 の数だけ引数を必須, n2 の数だけ引数を任意とします</li>
+</ul>
+</li>
+<li>MRB_ARGS_REST()</li>
+<li>MRB_ARGS_POST(n)</li>
+<li>MRB_ARGS_KEY(n1,n2)</li>
+<li>MRB_ARGS_BLOCK()<ul>
+<li>引数として block を受け取ります</li>
+</ul>
+</li>
+<li>MRB_ARGS_ANY()<ul>
+<li>任意個の引数をとります</li>
+</ul>
+</li>
+<li>MRB_ARGS_NONE()<ul>
+<li>引数なしです</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id6">
+<h4>メソッドの引数取得<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li>mrb_get_args() でメソッドに渡った引数の取得を行います</li>
+<li>format 文字列で引数の型や数などを取得できます</li>
+<li>想定と異なる数の引数が渡されたなどの場合に例外を投げます</li>
+</ul>
+</div>
+</div>
+<div class="section" id="new">
+<h3>new する系<a class="headerlink" href="#new" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mrb_obj_new()<ul>
+<li>新しいオブジェクトを new します</li>
+<li>mruby の世界でいう ExampleClass.new 的な操作になります</li>
+</ul>
+</li>
+<li>mrb_class_new_instance()<ul>
+<li>mrb_obj_new() のエイリアスです</li>
+</ul>
+</li>
+<li>mrb_instance_new()<ul>
+<li>mrb_obj_new() とほぼおなじ？</li>
+<li>引数にブロックを受け取れるとか引数の型が違うとかに差分がありそう</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id7">
+<h3>エラー・例外系<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mrb_raise(mrb_state *mrb, struct RClass *c, const char *msg)<ul>
+<li>例外を投げます</li>
+<li>mrb_state の jmp 先がなかったら abort() します</li>
+<li>第二引数は例外クラス、第三引数はメッセージを指定します</li>
+<li>mrb_raisef() を読んだ場合は例外メッセージをフォーマット指定できます</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="id8">
+<h3>未分別<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>mrb_gv_get(mrb, sym)<ul>
+<li>sym が指すグローバル変数を取得する</li>
+<li>やっていることはインスタンス変数の取得とほぼおなじ<ul>
+<li>globals グローバル変数テーブル</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>mrb_gv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)<ul>
+<li>v を新たにグローバル変数として、 sym シンボルで登録する</li>
+</ul>
+</li>
+<li>mrb_obj_eq(mrb, v1, v2)<ul>
+<li>v1 と v2 を比較し、同値の場合に true を返す</li>
+<li>比較方法<ul>
+<li>v1 と v2 の型を比較</li>
+<li>型ごとにキャストした結果を比較</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>mrb_obj_equal()<ul>
+<li>mrb_obj_eq() のエイリアス</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">便利関数など</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#details">Details</a><ul>
+<li><a class="reference internal" href="#id2">定義する系</a><ul>
+<li><a class="reference internal" href="#struct-rclass-mrb-define-class-mrb-state-mrb-const-char-name-struct-rclass-super">struct RClass *mrb_define_class(mrb_state *mrb, const char *name, struct RClass *super)</a></li>
+<li><a class="reference internal" href="#struct-rclass-mrb-define-module-mrb-state-const-char">struct RClass *mrb_define_module(mrb_state *, const char*)</a></li>
+<li><a class="reference internal" href="#void-mrb-define-class-method-mrb-state-struct-rclass-const-char-mrb-func-t-mrb-aspec">void mrb_define_class_method(mrb_state *, struct RClass *, const char *, mrb_func_t, mrb_aspec)</a></li>
+<li><a class="reference internal" href="#id3">クラス・モジュール関係</a></li>
+<li><a class="reference internal" href="#id4">定数・変数系関係</a></li>
+<li><a class="reference internal" href="#id5">メソッドの引数定義</a></li>
+<li><a class="reference internal" href="#id6">メソッドの引数取得</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#new">new する系</a></li>
+<li><a class="reference internal" href="#id7">エラー・例外系</a></li>
+<li><a class="reference internal" href="#id8">未分別</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="fiber.html" title="previous chapter">Fiber</a></li>
+      <li>Next: <a href="gc.html" title="next chapter">GC</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/functions.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Ryo Okubo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/functions.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
