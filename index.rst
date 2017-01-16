@@ -17,6 +17,7 @@ Contents:
    fiber
    functions
    gc
+   khash
    memory
    mrbgems
    object
