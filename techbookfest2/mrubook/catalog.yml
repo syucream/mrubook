@@ -1,7 +1,10 @@
 PREDEF:
 
 CHAPS:
-  - mrubook.re
+  - intro.re
+  - core.re
+  - vs_cruby.re
+  - epilogue.re
 
 APPENDIX:
 
