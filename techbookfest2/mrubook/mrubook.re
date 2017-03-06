@@ -22,7 +22,6 @@ mruby は先述の通り軽量、省メモリ Ruby の実装です。
 さらに mruby のサードパーティライブラリは mrbgem という単位で管理・配布可能です。ちょうど Ruby の RubyGems に相当します。
 mrbgem は mruby をビルドする際の設定ファイルにそれを利用する記述することで、ビルドされたバイナリにリンクされる形で取り込まれます。
 
-
 = 言語処理系コア
 
 では mruby の実装の話に入っていきましょう。まず触れるのは、 mruby を mruby たらんとさせている言語処理系の話から初めます。
@@ -50,13 +49,13 @@ nregs	レジスタの個数
 flags	irep の解釈の仕方を制御するためのフラグ
 iseq	コードセグメントの先頭番地へのポインタ。実体としては 32 ビット整数値(mrb_code) のポインタ
 pool	文字列、浮動小数点数、整数リテラルから生成したオブジェクトを格納する領域
-syms	シンボルの配列
-reps	TODO
+syms	変数名やメソッド名などの解決のためのシンボルテーブル
+reps	参照しうる他の irep へのポインタのリスト
 lv	ローカル変数配列。実体としてはシンボルと符号なし整数値のペアの配列
 ilen	iseq の長さ
 plen	pool の長さ
 slen	syms の長さ
-rlen	TODO
+rlen	reps の長さ
 refcnt	TODO
 //}
 
@@ -78,29 +77,81 @@ env	TODO
 == mruby コンパイラ
 
 では実際に mruby のソースコードを読みながら処理を追ってみます。
-mruby における字句解析、構文解析、 iseq 生成部分は mrbgems/mruby-compiler/ に存在します。
-mruby のコンパイラの仕事は mruby のスクリプトを解釈して、 mruby の VM が実行可能な iseq を出力することにあります。
+mruby における字句解析、構文解析、 iseq 生成部分の実装は mrbgems/mruby-compiler/ に存在します。
+mruby のコンパイラの仕事は mruby のスクリプトを解釈して、 RiteVM が実行可能な iseq を出力することにあります。
 
 iseq を得るまでの全体の流れは下記の通りになります。
 * なんか全体の流れがわかるいい感じの図
 
-まず mruby の字句解析ですが、スキャナ(字句解析器)は parse.y の parse_yylex() が該当します。
-parse_yylex() は基本的にソースコードを少しずつ読みつつトークンを得ていくのですが、キーワードの検出については lex.def で定義される mrb_reserved_word() を呼んでいます。
-これはゼロから実装されている訳ではなく、keywords に定義されている mruby のキーワードを検出するために GNU Perfect(gperf) で生成した完全ハッシュ関数を利用しています。
-この実装方法は CRuby でも同じだったりします。「Rubyソースコード完全解説」@<bib>{rhg} という書籍に詳細が掲載されていますので、詳しく知りたい方はそちらも合わせてご参照ください。
+mruby の字句解析・構文解析の実装は parse.y にあります。
+具体的にはスキャナ（字句解析器）が parse.y の parser_yylex() 、パーサ（構文解析器）が yyparse() が該当します。
+・・・そしてこの辺りの基本的な設計は CRuby と同じだったりします。
+「Rubyソースコード完全解説」@<bib>{rhg} という素晴らしい書籍に詳細が掲載されていますので、 CRuby と共通している部分の解説は省かせていただこうと思います。
+詳しく知りたい方はそちらも合わせてご参照ください。
 
-* 構文解析〜〜
-* parser_state について解説 parse.y にある
+parser_yylex() は nextc() でソースコードを少しずつ読み出し、 switch 文でトークンを識別し、トークンの内容を返します。
+またキーワードの検出については lex.def で定義される mrb_reserved_word() を呼んでいます。
+これは、keywords に定義されている mruby のキーワードを検出するために GNU Perfect(gperf) で完全ハッシュ関数を生成する形で実装されています。
+yyparse() は yacc の BNF によるシンタックスの定義から自動生成されます。
 
 コード生成を行っているのは codegen.c となります。
-このソースコードにおいて読解のエントリポイントとなるのは mrb_generate_code() でしょう。
+このソースコードにおいて読解のエントリポイントとなるのは mrb_generate_code() です。
 この関数は mrb_state 変数と parser_state 変数を取ってコード生成を行い、その結果を RProc の形式で返却します。
 mrb_generate_code() を正常系に絞って追っていきますと、大筋としては codegen() で irep の生成を行い、それを用いて mrb_proc_new() で RProc オブジェクトを生成しているのが分かります。
 
-codegen() は再帰呼び出しすることで構文木を辿り、ノード毎にコード生成を行い、 iseq の末尾に追加していきます。
-mrb_generate_code() は自身に渡された parser_state から AST のルートノードへのポインタを取り出して codegen() を呼び出す際に渡します。
-~~~
-文字列、浮動小数点数、整数ノードを見つけた場合は new_lit() を呼び出してオブジェクトを irep の pool に保存しておきます。
+mrb_generate_code() は引数に渡された、字句・構文解析の状態を保存するためのデータ構造 parser_state から AST のルートノードへのポインタを取り出して codegen() に渡します。
+構文木はリストの構造になっており、先頭要素を取り出すメンバ car と続くリストを取り出すメンバ cdr を持ちます。
+codegen() では基本的に car で取り出したノードのタイプによって switch 文で分岐し、コード生成を行い、 iseq の末尾に追加していきます。
+
+ノードのタイプは 103 種類ほどありコード生成について逐一詳細を追っていくのは困難です。
+ここでは取っ掛かりとして、下記のような典型的な "Hello,World!" と標準出力するだけの mruby スクリプトの irep を確認し、その構成要素について追ってみます。
+
+//listnum[hello.rb][mruby スクリプト例][ruby]{
+puts "Hello,World!"
+//}
+
+mruby では --verbose オプションを付けることで構文解析の結果と irep を確認することができます。
+早速上記のスクリプトを用いて確認してみます。
+
+//cmd{
+ $ ./bin/mruby --verbose hello.rb
+00001 NODE_SCOPE:
+00001   NODE_BEGIN:
+00001     NODE_CALL:
+00001       NODE_SELF
+00001       method='puts' (383)
+00001       args:
+00001         NODE_STR "Hello,World!" len 12
+...
+
+Hello,World!
+//}
+
+このサンプルでは NODE_SCOPE 、 NODE_BEGIN 、 NODE_CALL 、 NODE_SELF 、 NODE_STR というノードが得られたようです。
+それぞれ codegen() でどのように処理されるのか見ていきます。
+
+まず先頭ノードの、スクリプトの一番外側を示す NODE_SCOPE ですが、 scope_body() を呼んでいるだけです。
+scope_body() ではまず codegen() を呼び出し次のノードのコード生成を行います。
+それが終わると STOP 命令もしくは RETURN 命令を追加します。
+ちなみにコード生成は MKOP_A などのマクロによって生成されます。コード生成マクロは取りうるオペランドによってバリエーションがあります。
+そして生成されたコードの iseq への追加は genop() で行われます。
+
+次は NODE_BEGIN です。
+NODE_BEGIN ではツリーが辿れない場合は NODENIL 命令を追加、辿れる場合は辿れる分まで codegen() を while ループで呼び出してコード生成を行います。
+
+NODE_CALL の処理は gen_call() にまとめられています。
+gen_call() ではまずリストの次の要素を codegen() に渡します。
+これがメソッドのレシーバとなる想定であり、上記コードなら NODE_SELF がそれに該当します。
+〜〜TODO〜〜
+最後に、呼び出すのがブロックでなければ SEND 命令、ブロックであれば SENDB 命令を追加します。
+
+NODE_SELF はシンプルで、 genop() で LOADSELF 命令を追加するだけです。
+
+最後に NODE_STR ですが、まずリストの後続 2 要素を取り出します。
+これらはそれぞれ char* 型の文字列先頭へのポインタと文字列のサイズを意味する値が入っています。
+その後 mrb_str_new() を使って、この 2 変数から String 型オブジェクトを生成し、 new_lit() に渡します。
+new_lit() は渡されたオブジェクトを irep の pool 領域に格納します。
+ちなみにこの new_lit() は文字列の他にも整数、浮動小数点数リテラルから生成したオブジェクトを保存するのにも使用します。
 
 == Rite VM
 
@@ -172,11 +223,12 @@ POPERR A	実行コンテキストから A の値分だけ rescue 時処理を削
 RAISE A	A が指すレジスタを proc オブジェクトとして解釈して mrb_state の exc にコピーして例外処理をする
 EPUSH Bx	プログラムカウンタに sBx 加算した値を ensure 時処理として実行コンテキストに追加する
 POPERR A	実行コンテキストから A の値分だけ ensure 時処理を呼び出しつつ削除する
-SEND A B C	TODO
-CALL A	TODO
-SUPER A C	TODO
+SEND A B C	A が指すレジスタのオブジェクトをレシーバとし、 B が指すシンボルのメソッドを C が指す引数の個数で呼び出す
+CALL A	self を Proc オブジェクトとみなして呼び出す
+SUPER A C	レシーバの親クラスのメソッドを C が指す引数の個数で呼び出す
 ARGARY A Bx	TODO
 ENTER Ax	TODO
+RETURN A B	TODO
 TAILCALL A B C	TODO
 BLKPUSH A Bx	TODO
 //}
@@ -200,6 +252,42 @@ GT A B C	A が指すレジスタに、 A が指すレジスタと A+1 が指す�
 GE A B C	A が指すレジスタに、 A が指すレジスタと A+1 が指すレジスタが整数と浮動小数点数の組み合わせの際に後者の方が小さい値もしくは同値どうかをセットする
 //}
 
+//table[opcode_array][配列操作命令]{
+命令	内容
+-------------------------------------------------------------
+ARRAY A B C	A が指すレジスタに、 B から B + C 番目までのレジスタに格納されている値をコピーして Array オブジェクトをセットする
+ARYCAT A B	A が指すレジスタに、 A が指すレジスタと B が指すレジスタの Array オブジェクトを結合してセットする
+ARYPUSH A B	A が指すレジスタにセットされている Array オブジェクトに、 B が指すレジスタの値を末尾に追加する
+AREF A B C	A が指すレジスタに、 B が指すレジスタにセットされている Array オブジェクトの C 番目の要素をセットする
+ASET A B C	A が指すレジスタの値を B が指すレジスタにセットされている Array オブジェクトの C 番目の要素としてセットする
+APOST A B C	TODO
+//}
+
+//table[opcode_objects][オブジェクト操作命令]{
+命令	内容
+-------------------------------------------------------------
+STRING A Bx	A が指すレジスタに Bx 番目の pool に格納された String オブジェクトを複製した結果をセットする
+STRCAT A B	A が指すレジスタに、 A と B が指すレジスタに格納された String オブジェクトを結合した結果をセットする
+HASH A B C	A が指すレジスタに、 B から B + C * 2 番目のレジスタに格納されているオブジェクトを、キーとバリューのペアの繰り返しとみなして読み出し Hash オブジェクトを生成して、その結果をセットする
+LAMBDA A B C	TODO
+OCLASS A	TODO
+CLASS A	TODO
+MODULE A B	TODO
+EXEC A Bx	TODO
+METHOD A B	TODO
+SCLASS A B	TODO
+TCLASS A	TODO
+RANGE A B C	TODO
+//}
+
+//table[opcode_etc][その他の命令]{
+命令	内容
+-------------------------------------------------------------
+NOP	なにもしません
+DEBUG A B C	mruby のビルド時のオプションによって動作が異なります。 mrb_state の debug_op_hook() 呼び出しかデバッグ情報の printf 出力、もしくは abort() します
+STOP	現在の実行コンテキストの ensure ブロックの呼び出しを行った後、ジャンプ先の設定をし、例外オブジェクトもしくは irep->nlocals 番目のレジスタの値を return します
+ERR A Bx	pool の Bx 番目の要素を例外メッセージとしてとり、 A が 0 なら RuntimeError、それ以外なら LocalJumpError を raise します
+//}
 
 === VM の状態を示すデータ構造 mrb_state 
 
@@ -217,22 +305,42 @@ gc	GC 情報 TODO
 
 === 実行コンテキスト mrb_context
 
-mrb_context は VM の実行コンテキストを保持するデータ構造です。下記のような情報を保持します。
+mrb_context は VM の実行コンテキストを保持するデータ構造です。
+この構造は Fiber を実現するために使われています。
+始点となるルート実行コンテキスト（mrb_state の root_c）から、 fiber を生成するたびにそれに対応する実行コンテキストが生成されるイメージです。
+
+mrb_context では下記のような情報を保持します。
 
 //table[mrb_context][mrb_context の構造]{
 名前	内容 
 -------------------------------------------------------------
-prev	以前のコンテキスト。例えば Fiber における親 fiber
-stack, stbase, stend	RiteVM のレジスタ情報（ただし 0 番目の要素は self オブジェクトを指す用途で使用される）
+prev	自身を呼び出した側の実行コンテキスト。 root_c か親 fiber になる
+stack, stbase, stend	RiteVM のレジスタ情報（ただし 0 番目の要素は self オブジェクトを指す用途で使用）
 ci, cibase, cind	メソッド呼び出し情報
 rescue, rsize	rescue ハンドラに関する情報
 ensure, esize	ensure ハンドラに関する情報
 status, fib	そのコンテキストの持ち主の fiber の実行状態とその fiber へのポインタ
 //}
 
+せっかく Fiber の話題が出たので、 Fiber の中身についても少しだけ触れてみます。
+Fiber は実行コンテキストを保持するオブジェクトです。
+ソースコード中では RFiber という構造体で表現されています。
+
+//table[RFiber][RFiber の構造]{
+名前	内容 
+-------------------------------------------------------------
+MRB_OBJECT_HEADER	オブジェクトのヘッダ
+cxt	その Fiber オブジェクトの実行コンテキスト
+//}
+
+ちなみに mruby では Fiber は mrbgems として切り出されています。
+つまりは不要なら Fiber を含まない形でビルドできる訳ですね・・・！
+
 === メソッド呼び出し情報 mrb_callinfo
 
-mrb_context は mruby のメソッド呼び出しに関わるデータ構造です。下記のような情報を保持します。
+mrb_callinfo は mruby のメソッド呼び出しに関わるデータ構造です。
+
+mrb_callinfo 下記のような情報を保持します。
 
 //table[mrb_callinfo][mrb_callinfo の構造]{
 名前	内容 
@@ -289,19 +397,28 @@ JMP, JMPIF, JMPNOT 命令はオペランドの条件によってプログラム�
 基本的に前のページで述べた通りなのですが、これらの命令は実行コンテキスト（mrb->c） やそのメソッド呼び出し情報（mrb->c->ci）の例外に関する情報を更新します。
 ちなみに rescue, ensure ブロックを保存する配列のサイズが足りなくなった際、最初は 16 要素分、その後不足が出た際に 32, 64 と倍々に mrb_realloc() で領域を確保し直します。
 
+==== RiteVM による実際の irep の解釈例
 
+ある程度 RiteVM の実装の形が見えてきたところで、実際の irep を確認してみましょう。
+コード生成部分で触れた、単純な Hello,World! スクリプトから生成される irep は下記の通りになります。
+
+//cmd{
+irep 0x7fdba9c0b9b0 nregs=4 nlocals=1 pools=1 syms=1 reps=0
+file: hello.rb
+    1 000 OP_LOADSELF   R1
+    1 001 OP_STRING     R2      L(0)    ; "Hello,World!"
+    1 002 OP_SEND       R1      :puts   1
+    1 003 OP_STOP
+//}
+
+生成された irep は 1 個であり、他の irep を参照しません。（reps=0）
+また、 pools の要素は 1 （"Hello,World!" を指す String オブジェクトでしょう）、 syms の数は 1 （puts メソッドの名前でしょう）のようです。
 
 = Ruby との比較
-
-== クラスとオブジェクト
-
-== 変数と定数
 
 == khash
 
 == ガベージコレクション
-
-= 標準ライブラリ
 
 = おわりに
 
