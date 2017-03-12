@@ -1,17 +1,18 @@
 = 言語処理系コア
 
-では mruby の実装の話に入っていきましょう。まず触れるのは、 mruby を mruby たらんとさせている言語処理系の話から初めます。
+では mruby の実装の話に入っていきましょう。
+まず触れるのは、 mruby を mruby たらんとさせている言語処理系の話から初めます。
 
 == 中間表現
 
-mruby の VM が解釈する中間表現のコードは mruby としては iseq(instruction sequence) と呼ばれます。
+mruby の VM が解釈する中間表現のコードは mruby としては iseq(Instruction Sequence) と呼ばれます。
 これはソースコード上は mrb_code という uint32_t 型の別名として表現されています。
 
-また iseq にシンボル情報などを付与したものは irep (internal representation) という名前で呼ばれています。
+また iseq にシンボル情報などを付与したものは irep (Internal Representation) という名前で呼ばれています。
 
 言語処理系のコンパイラや VM の実装を読む前に、まずはこの irep の中身を探索してみましょう。
 
-=== irep (internal representation)
+=== irep (Internal Representation)
 
 irep は include/mruby/irep.h で定義される、 mruby のコードの実行に必要な情報を保持する基本的なデータ構造です。
 大きく分けて、実行するコード自体のデータ iseq 、ローカル変数やプールなどの情報、ソースコードのファイル名などのデバック情報を含みます。
@@ -32,7 +33,6 @@ ilen	iseq の長さ
 plen	pool の長さ
 slen	syms の長さ
 rlen	reps の長さ
-refcnt	TODO
 //}
 
 === RProc
