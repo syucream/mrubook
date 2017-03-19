@@ -28,6 +28,8 @@ booktitle: mrubook mrubyの実装を探検する薄い本
 # 著者名。「, 」で区切って複数指定できる
 # 読みを入れる例 aut: [{name: "青木峰郎", file-as: "アオキミネロウ"}, {name: "武藤健志", file-as: "ムトウケンシ"}, {name: "高橋征義", file-as: "タカハシマサヨシ"}, {name: "角征典", file-as: "カドマサノリ"}]
 aut: ["@syu_cream"]
+csl: ["なるはやでいい感じにやるマン"]
+pbl: ["ねこのしっぽ様"]
 
 # 以下はオプション
 # 以下はオプション(autと同じように配列書式で複数指定可能)。
@@ -122,7 +124,7 @@ secnolevel: 2
 # part_secnolevel: 1
 
 # 本文中に目次ページを作成するか。省略した場合はnull (作成しない)
-# toc: true
+toc: true
 
 # EPUB2標準の目次(NCX)以外に物理目次ファイルを作成するか。省略した場合はnull (作成しない)
 # ePUB3においてはこの設定によらず必ず作成される
@@ -133,9 +135,9 @@ secnolevel: 2
 #
 # 表紙に配置し、書籍の影絵にも利用する画像ファイル。省略した場合はnull (画像を使わない)。画像ディレクトリ内に置いてもディレクトリ名は不要(例: cover.jpg)
 coverimage: cover.jpg
-#
+
 # 表紙の後に大扉ページを作成するか。省略した場合はnull (作成しない)
-# titlepage: null
+titlepage: true
 #
 # 自動生成される大扉ページを上書きするファイル。ファイル名を指定すると大扉として入る
 # titlefile: null
@@ -147,13 +149,13 @@ coverimage: cover.jpg
 # creditfile: null
 
 # 奥付を作成するか。デフォルトでは作成されない。trueを指定するとデフォルトの奥付、ファイル名を指定するとそれがcolophon.htmlとしてコピーされる
-# colophon: null
+colophon: true
 
 # 裏表紙ファイル (画像はcoversまたはimagesに配置する)。ファイル名を指定すると裏表紙として入る
 # backcover: null
 
 # プロフィールページファイル。ファイル名を指定すると著者紹介として入る
-# profile: null
+# profile: profile.re
 # プロフィールページの目次上の見出し
 # profiletitle: 著者紹介
 
