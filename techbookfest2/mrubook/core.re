@@ -187,6 +187,13 @@ OP_SETCONST A Bx	R(A) の値を Syms(Bx) が指す定数の値として格納す
 命令	内容
 -------------------------------------------------------------
 OP_JMP sBx	sBx 分だけプログラムカウンタを増やす
+JMPIF, JMPNOT A sBx	R(A) の評価結果が true/false だった場合、 sBx 分だけプログラムカウンタを増やす
+OP_ONERR sBx	プログラムカウンタに sBx 加算した値を rescue 時処理として実行コンテキストに追加する
+OP_RESCUE A	R(A) に mrb->exc をコピーし、 mrb->exc をクリアする
+OP_POPERR A	実行コンテキストから A の値分だけ rescue 時処理を削除する
+OP_RAISE A	R(A) を proc オブジェクトとして解釈して mrb->exc にコピーし、例外処理を開始する
+OP_EPUSH Bx	Bx 番目の reps を ensure 処理すべき proc オブジェクトとして mrb->c->ensure に格納する
+OP_POPERR A	実行コンテキストから A の値分だけ ensure 時処理を呼び出しつつ削除する
 OP_SEND A B C	R(A) のオブジェクトをレシーバとし、 Syms(B) のメソッドを C の個数の引数で呼び出す
 OP_ENTER Ax	メソッドの引数のチェックを行う。 Ax から 5:5:1:5:5:1:1 ビットのフィールドを取り出し、引数の数情報として利用する
 OP_RETURN A B	 R(A) を戻り値としてメソッドからリターンする
@@ -377,3 +384,77 @@ irep が示す命令の処理フローを追ってみます。
 その後 OP_SEND で puts メソッドを呼び出します。
 puts メソッドから見て self は R1 、引数は 1 個で R2 が該当する形になります。
 最後にすべての命令を実行し終えたので OP_STOP で終了処理に入ります。
+
+==== RiteVM 命令処理
+
+例外処理の実装は複雑なので、別途 irep を出力してそれを足がかりに追ってみます。
+例外処理に関する命令は簡単に分類すると OP_RAISE は raise に関する命令、 OP_ONERR, OP_POPERR, OP_RESCUE は rescue に関する命令、 OP_EPUSH, OP_EPOP は ensure に関する命令になります。
+また例外処理に関するデータとしては、例外クラスを指す mrb->exc と mrb->c->rescue や mrb->c->ensure
+
+まずは馴染みのある、シンプルな例外処理を行うスクリプトを書いてみます。
+
+//listnum[exc.rb][例外処理するスクリプト例][ruby]{
+begin
+  raise StandardError
+rescue
+  puts "rescue"
+ensure
+  puts "ensure"
+end
+//}
+
+これを --verbose 付きで実行した際に出力される irep に、ざっくりとした処理のフローを加えたものが下記のようになります。
+
+//image[exc][例外処理を含む irep とその処理フロー]
+
+では具体的な各処理のフローを深掘りしてみましょう。
+1 番目の irep は exc メソッドの中を表しているように見えます。
+早速 OP_EPUSH が呼び出され、 ensure ブロックを表現する irep（2 番目の irep）を mrb->c->ensure に追加し、 mrb->c->ci->eidx をインクリメントします。
+また同様に rescue ブロックに関しても OP_ONERR で mrb->c->resuce に追加し、 mrb->c->ci->ridx をインクリメントします。
+ただし OP_ONERR は irep を追加するのではなく、同一 irep 内の iseq のポインタを格納する形になります。
+
+その後 OP_SEND で raise メソッドを呼び出します。
+このメソッドは Kernel#raise として src/kernel.c に定義され、 C の関数としては mrb_f_raise() が該当します。
+この関数は引数により取りうる振る舞いが変わりますが、最終的に src/error.c に定義される mrb_exc_raise() を呼び出します。
+そして mrb_exc_raise() では mrb->exc に例外オブジェクトを格納し、 MRB_THROW() マクロで例外と rescue ブロックの捕捉を行います。
+
+ここで mrb_context_run() における例外処理の実現方法について触れておきます。
+ざっくりと C のコードで表現すると下記のようになります。
+
+//listnum[mrb_context_run_exc.c][mrb_context_run() における例外処理][c]{
+MRB_TRY(...) {
+  // MRB_THROW を呼ぶ可能性のある処理
+} MRB_CATCH(...) {
+  // MRB_THROW が呼ばれた際に実行する処理
+  // mrb_context_run() においては例外捕捉フラグを立てて再度 MRB_TRY のブロックに入る
+}
+//}
+
+mrb_context_run() では命令を処理する for ループを MRB_TRY マクロに続くブロックで囲います。
+この MRB_TRY が setjmp マクロを使って例外が上がった際にジャンプする先として扱われます。
+MRB_TRY のブロック内で MRB_THROW マクロが呼び出されると、これが longjmp() の呼び出しを行なうため MRB_TRY まで戻ってくることになり、かつ MRB_TRY 内の if 文の条件が満たせなくなる戻り値を返すためMRB_CATCH マクロのブロックが実行されます。
+MRB_CATCH マクロのブロックでは例外の捕捉を行なう旨のフラグが true になり、これにより実際に例外処理をする L_RAISE ラベルまでジャンプします。
+
+そんな流れで、 raise メソッドを呼び出した後に mrb_context_run() 内の L_RAISE ラベルにジャンプした後ですが、 mrb_exc_raise() により mrb->exc と、 OP_ONERR により mrb->c->ci->ridx が更新された都合、 rescue の処理が発生すると判断され L_RESCUE ラベルにジャンプします。
+L_RESCUE は mrb->c->rescue から rescue 時にジャンプする先のポインタ、この例では 006 の箇所へジャンプします。
+
+006 へジャンプした後は OP_RESCUE により、 raise メソッドによって設定された mrb->exc を R1 にコピーして mbr->exc はゼロクリアします。
+その後 StandardError を R2 に、 R1 にコピーした mrb->exc を R3 にコピーし、 R2 をレシーバオブジェクトとして === メソッドを OP_SEND で呼び出します。
+これが、例外クラスが rescue の対象のクラス（ここでは StandardError ）と同値かの比較に相当します。
+この例ではこの比較によって R2 に true が格納され、後続の OP_JMPIF の条件にマッチし 012 へジャンプします。
+
+012 から 014 は 単純に puts メソッドに文字列を出力させる命令群です。
+これらについては既に触れたとおりなので割愛します。
+puts メソッドの呼び出しまで完了したら OP_JMP で 018 にジャンプします。
+
+018 の OP_EPOP では A に指定された回数だけ mrb->c->ensure に詰まれた ensure の proc を呼び出します。
+この例では A に 1 が指定され、かつ現在の irep の冒頭で OP_EPUSH で ensure の proc が 1 つ詰まれているのでそれを呼び出すことになります。
+実際の ensure proc 呼び出しは ecall() という関数に切り出されています。
+ecall() は mrb->c->ensure から ensure proc を取り出して、 cipush() などからなる新しいコールスタックと mbr->c->stack の調整を行い、 mrb_run() で実際の ensure の命令が収められている irep を実行します。
+
+ensure proc の irep の内容や OP_STOP についてはこれまでで解説済みなので割愛します。
+・・・以上で、 raise から始まり rescue で例外をキャッチしてから ensure が呼び出されるまでのフローです。
+
+余談ですが、 mrb->c->rescue や mrb->c->ensure のサイズが足りなくなった際は、最初は 16 要素分、その後不足が出た際に 32, 64 と倍々に mrb_realloc() で領域を確保し直します。
+この倍々に領域を増やすというロジックは mruby の実装ではよく見られるパターンでして、具体的には mrb->c->stack や mrb->c->ci の伸長でも同様だったりします。
+
