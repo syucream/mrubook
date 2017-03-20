@@ -1,3 +1,5 @@
+= 参考文献
+
 //bibpaper[rhg][Rubyソースコード完全解説]
 //bibpaper[mruby_book][まつもとゆきひろ直伝　組込Ruby「mruby」のすべて 総集編]
 //bibpaper[lang_book][まつもとゆきひろ 言語のしくみ]
