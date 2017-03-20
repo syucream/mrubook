@@ -1,9 +1,12 @@
 = 言語処理系コア
 
+ここから mruby の実装の内容に踏み込んでいきます。
+さてまずはどこから着手しましょうか？
+
 「まつもとゆきひろ 言語のしくみ」@<bib>{lang_book} において、 Matz は mruby の開発において実行効率の良い VM に主眼を置き、まず VM の実装から着手したと語っています。
 そんな mruby を mruby たらんとさせている言語処理系の話から、 mruby の実装に触れていきましょう。
 
-ざっくりと言語処理系コア部分の概要を表すと下図のようになります。
+ざっくりと言語処理系コア部分の概要を表すと @<img>{lang_core} のようになります。
 mruby の VM(RiteVM) が解釈するコードに関する情報として irep というデータがあり、字句・構文解析器とコード生成器からなるコンパイラ部分が irep を含むデータを出力、 RiteVM が実行という構図になります。
 
 //image[lang_core][mruby の言語処理系コア部分]
@@ -21,7 +24,7 @@ irep は mruby のコードの実行に必要な情報を保持する基本的�
 この構造は mruby のコードのスコープに対応します。
 スコープの実現のため、実行するコード自体のデータ iseq に加え、ローカル変数やレジスタ、プールなどの情報を含みます。
 
-詳細は下記に示すとおりです。
+詳細は @<table>{irep} に示すとおりです。
 ソースコードとしては include/mruby/irep.h に定義されています。
 
 //tsize[30,80]
@@ -42,7 +45,7 @@ lv	ローカル変数配列。実体としてはシンボルと符号なし整�
 
 mruby の Proc オブジェクト型です。
 mruby ではコンパイラがこのオブジェクトを生成し、 RiteVM が実行することで mruby で処理を行う形になります。
-RProc のデータ構造は下記の通りになります。
+RProc のデータ構造は @<table>{RProc} の通りになります。
 
 //tsize[40,80]
 //table[RProc][RProc の構造]{
@@ -88,7 +91,7 @@ mrb_generate_code() は引数に渡された、字句・構文解析の状態を
 codegen() では基本的に car で取り出したノードのタイプによって switch 文で分岐し、コード生成を行い、 iseq の末尾に追加していきます。
 
 ノードのタイプは 103 種類ほどありコード生成について逐一詳細を追っていくのは困難です。
-ここでは下記のような典型的な "Hello,World!" と標準出力するだけの mruby スクリプトの AST を確認し、その構成要素について追ってみます。
+ここでは @<list>{hello.rb} のような典型的な "Hello,World!" と標準出力するだけの mruby スクリプトの AST を確認し、その構成要素について追ってみます。
 
 //listnum[hello.rb][mruby スクリプト例][ruby]{
 puts "Hello,World!"
@@ -145,7 +148,7 @@ RiteVM についてつらつらと書いていきます。
 === 命令セットアーキテクチャ
 
 RiteVM はレジスタマシンとして動作します。
-1 つの命令は 32 ビットで表現され、 7 ビットのオペコードと 0 個以上 3 個以上のオペランドを取る形式になり、下記のようなバリエーションが存在します。
+1 つの命令は 32 ビットで表現され、 7 ビットのオペコードと 0 個以上 3 個以上のオペランドを取る形式になり、 @<table>{operands} のようなバリエーションが存在します。
 
 //table[operands][オペランド種別]{
 名前	内容 
@@ -158,7 +161,7 @@ sBx	16 ビット長のオペランド(符号付き)
 C	7 ビット長のオペランド
 //}
 
-mruby の一部の命令を以下に記します。
+mruby の一部の命令を @<table>{opcode_loads},  @<table>{opcode_variables},  @<table>{opcode_controlls},  @<table>{opcode_operations},  @<table>{opcode_objects},  @<table>{opcode_etc} に記します。
 命令の内容説明で R(A) などと書かれている部分は オペランド A 番目のレジスタの値、 Syms(A) の場合は syms の A 番目の値、 Pool(A) の場合は pool の A 番目の値だと解釈してください。
 
 //table[opcode_loads][基本ロード命令]{
@@ -240,7 +243,7 @@ OP_STOP	VM の実行を終了する
 
 RiteVM では命令の実行状態を管理するため mrb_state や mrb_context 、 mrb_callinfo などといったデータ構造を用意しています。
 RiteVM の命令実行は irep で表現された命令を解釈しながらこれらのデータを操作していくことで進められていきます。
-各データ構造の関係をざっくり示すと下図のようになります。
+各データ構造の関係をざっくり示すと @<img>{mrb_states} のようになります。
 
 //image[mrb_states][RiteVM の状態管理のためのデータ構造]
 
@@ -248,7 +251,8 @@ RiteVM の命令実行は irep で表現された命令を解釈しながらこ�
 
 ==== RiteVM の状態を示すデータ構造 mrb_state 
 
-mrb_state は RiteVM の実行状態情報を保持するデータ構造です。下記のような情報を保持します。
+mrb_state は RiteVM の実行状態情報を保持するデータ構造です。
+@<table>{mrb_state} のような情報を保持します。
 
 //table[mrb_state][mrb_state の構造]{
 名前	内容 
@@ -268,7 +272,7 @@ mrb_context は RiteVM の実行コンテキストを保持するデータ構造
 この構造は Fiber を実現するために使われています。
 始点となるルート実行コンテキスト（mrb_state の root_c）から、 fiber を生成するたびにそれに対応する実行コンテキストが生成されるイメージです。
 
-mrb_context では下記のような情報を保持します。
+mrb_context では @<table>{mrb_context} のような情報を保持します。
 
 //tsize[40,80]
 //table[mrb_context][mrb_context の構造]{
@@ -288,7 +292,7 @@ stack というメンバが出てきて混乱を招きそうですが、これ�
 //image[stack][stack 領域の使われ方]
 
 Fiber の中身についても少しだけ触れてみます。
-Fiber は実行コンテキストを保持するオブジェクトです。
+Fiber は @<table>{RFiber} に示す通り、実行コンテキストを保持するオブジェクトです。
 ソースコード中では RFiber という構造体で表現されています。
 
 //tsize[40,80]
@@ -307,7 +311,7 @@ cxt	その Fiber オブジェクトの実行コンテキスト
 mrb_callinfo は mruby のメソッドのコールスタックを管理するための構造です。
 メソッドが呼び出される度に mrb_context 構造体の ci に新しい mrb_callinfo 構造体データを push 、逆にメソッドから抜ける際は ci の要素を pop します。
 
-下記のような情報を保持します。
+@<table>{mrb_callinfo} のような情報を保持します。
 
 //tsize[30,80]
 //table[mrb_callinfo][mrb_callinfo の構造]{
@@ -385,13 +389,13 @@ irep が示す命令の処理フローを追ってみます。
 puts メソッドから見て self は R1 、引数は 1 個で R2 が該当する形になります。
 最後にすべての命令を実行し終えたので OP_STOP で終了処理に入ります。
 
-==== RiteVM 命令処理
+==== 例外処理の詳細
 
 例外処理の実装は複雑なので、別途 irep を出力してそれを足がかりに追ってみます。
 例外処理に関する命令は簡単に分類すると OP_RAISE は raise に関する命令、 OP_ONERR, OP_POPERR, OP_RESCUE は rescue に関する命令、 OP_EPUSH, OP_EPOP は ensure に関する命令になります。
 また例外処理に関するデータとしては、例外クラスを指す mrb->exc と mrb->c->rescue や mrb->c->ensure
 
-まずは馴染みのある、シンプルな例外処理を行うスクリプトを書いてみます。
+まずは @<list>{exc.rb} に示すようなシンプルな例外処理を行うスクリプトを書いてみます。
 
 //listnum[exc.rb][例外処理するスクリプト例][ruby]{
 begin
@@ -403,7 +407,7 @@ ensure
 end
 //}
 
-これを --verbose 付きで実行した際に出力される irep に、ざっくりとした処理のフローを加えたものが下記のようになります。
+これを --verbose 付きで実行した際に出力される irep に、ざっくりとした処理のフローを加えたものが @<img>{exc} のようになります。
 
 //image[exc][例外処理を含む irep とその処理フロー]
 
@@ -419,7 +423,7 @@ end
 そして mrb_exc_raise() では mrb->exc に例外オブジェクトを格納し、 MRB_THROW() マクロで例外と rescue ブロックの捕捉を行います。
 
 ここで mrb_context_run() における例外処理の実現方法について触れておきます。
-ざっくりと C のコードで表現すると下記のようになります。
+ざっくりと C のコードで表現すると @<list>{mrb_context_run_exc.c} のようになります。
 
 //listnum[mrb_context_run_exc.c][mrb_context_run() における例外処理][c]{
 MRB_TRY(...) {
