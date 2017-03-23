@@ -37,7 +37,7 @@ flags	irep の解釈の仕方を制御するためのフラグ
 iseq	コードセグメントの先頭番地へのポインタ。実体としては 32 ビット整数値(mrb_code) のポインタ
 pool	文字列、浮動小数点数、整数リテラルから生成したオブジェクトを格納する領域
 syms	変数名やメソッド名などの解決のためのシンボルテーブル
-reps	参照しうる他の irep へのポインタのリスト
+reps	他の irep へのポインタのリスト
 lv	ローカル変数配列。実体としてはシンボルと符号なし整数値のペアの配列
 //}
 
@@ -62,9 +62,11 @@ env	レジスタやシンボル情報を保存する REnv 構造体データ
 
 mruby のコンパイラの実装は mrbgems/mruby-compiler/ に存在します。
 こいつの仕事は mruby のスクリプトを解釈して、 RiteVM が実行可能な irep を出力することにあります。
+ちなみに、 mrbgems/ 以下にあることからもわかるとおり、 mruby のコンパイラは mrbgem 扱いでありビルド時に含まないようにすることもできます。
+使用可能なリソースが限られる組み込み機器に配慮した設計になっていると言えそうです。
 
 mruby のコンパイラは大きく分けて字句・構文解析と コード生成部分があります。
-個別に深掘りしてみます。
+個別に深掘りしてみましょう。
 
 === 字句・構文解析
 
@@ -83,15 +85,16 @@ yyparse() は yacc の BNF によるシンタックスの定義から自動生�
 
 コード生成を行っているのは codegen.c となります。
 このソースコードにおいて読解のエントリポイントとなるのは mrb_generate_code() です。
-この関数は mrb_state 変数と parser_state 変数を取ってコード生成を行い、その結果を RProc の形式で返却します。
-mrb_generate_code() を正常系に絞って追っていきますと、大筋としては codegen() で irep の生成を行い、それを用いて mrb_proc_new() で RProc オブジェクトを生成しているのが分かります。
+この関数は mrb_state （詳細は RiteVM の節で触れます）変数と parser_state （mruby コンパイラの状態を管理するためのデータ構造）変数を取ってコード生成を行い、その結果を RProc の形式で返却します。
+mrb_generate_code() を追っていきますと、大筋としては codegen() で irep の生成を行い、その結果を用いて mrb_proc_new() で RProc オブジェクトを生成しているのが分かります。
 
-mrb_generate_code() は引数に渡された、字句・構文解析の状態を保存するためのデータ構造 parser_state から AST のルートノードへのポインタを取り出して codegen() に渡します。
-構文木はリストの構造になっており、先頭要素を取り出すメンバ car と続くリストを取り出すメンバ cdr を持ちます。
-codegen() では基本的に car で取り出したノードのタイプによって switch 文で分岐し、コード生成を行い、 iseq の末尾に追加していきます。
+mrb_generate_code() は引数に渡された parser_state から構文木のルートノードへのポインタを取り出して codegen() に渡します。
+構文木はリストになっており、先頭要素を取り出すメンバ car と続くリストを取り出すメンバ cdr を持ちます。
+codegen() では基本的に car で取り出したノードのタイプによって switch 文で分岐し、コード生成を行って iseq の末尾に追加していきます。
 
-ノードのタイプは 103 種類ほどありコード生成について逐一詳細を追っていくのは困難です。
-ここでは @<list>{hello.rb} のような典型的な "Hello,World!" と標準出力するだけの mruby スクリプトの AST を確認し、その構成要素について追ってみます。
+ノードのタイプは 103 種類ほどあり、 switch 文で分岐した先のコード生成について逐一詳細を追っていくのは困難です。
+ここでは @<list>{hello.rb} のような典型的な "Hello,World!" と標準出力するだけの mruby スクリプトの構文木を確認し、その構成要素について追ってみます。
+なお、ここで生成されるコードに関しての詳細は RiteVM の節で触れていきます。
 
 //listnum[hello.rb][mruby スクリプト例][ruby]{
 puts "Hello,World!"
@@ -124,7 +127,7 @@ scope_body() ではまず codegen() を呼び出し次のノードのコード�
 そして生成されたコードの iseq への追加は genop() で行われます。
 
 次は NODE_BEGIN です。
-NODE_BEGIN ではツリーが辿れない場合は NODENIL 命令を追加、辿れる場合は辿れる分まで codegen() を while ループで呼び出してコード生成を行います。
+これはツリーが辿れない場合は NODENIL 命令を追加、辿れる場合は辿れる分まで codegen() を while ループで呼び出してコード生成を行います。
 
 NODE_CALL の処理は gen_call() にまとめられています。
 gen_call() ではまずリストの次の要素を codegen() に渡します。
@@ -142,8 +145,8 @@ new_lit() は渡されたオブジェクトを irep の pool 領域に格納し�
 
 == Rite VM
 
-mruby の一番の特徴は mruby の VM (RiteVM) にあるとも考えられるでしょう。
-RiteVM についてつらつらと書いていきます。
+前節で触れた irep は、実際には mruby においてどのように解釈されるのでしょうか？
+mruby で irep を実行する VM 、 RiteVM についてつらつらと書いていきます。
 
 === 命令セットアーキテクチャ
 
@@ -161,8 +164,11 @@ sBx	16 ビット長のオペランド(符号付き)
 C	7 ビット長のオペランド
 //}
 
-mruby の一部の命令を @<table>{opcode_loads},  @<table>{opcode_variables},  @<table>{opcode_controlls},  @<table>{opcode_operations},  @<table>{opcode_objects},  @<table>{opcode_etc} に記します。
-命令の内容説明で R(A) などと書かれている部分は オペランド A 番目のレジスタの値、 Syms(A) の場合は syms の A 番目の値、 Pool(A) の場合は pool の A 番目の値だと解釈してください。
+mruby の一部の命令をざっくりとカテゴリ分けしたものを @<table>{opcode_loads},  @<table>{opcode_variables},  @<table>{opcode_controlls},  @<table>{opcode_operations},  @<table>{opcode_objects},  @<table>{opcode_etc} に記します。
+なおそれぞれの表中の、命令の内容説明で R(A) などと書かれている部分は オペランド A 番目のレジスタの値、 Syms(A) の場合は syms の A 番目の値、 Pool(A) の場合は pool の A 番目の値だと解釈してください。
+
+捕捉となりますが、二項演算命令ではレジスタの値の型が数値、浮動小数点数、文字列かどうかにより結果が変わります。
+これらの条件にマッチしない場合は代わりに OP_SEND 命令を実行します。
 
 //table[opcode_loads][基本ロード命令]{
 命令	内容
@@ -185,7 +191,7 @@ OP_GETCONST A Bx	R(A) に Syms(Bx) が指す定数の値をコピーする
 OP_SETCONST A Bx	R(A) の値を Syms(Bx) が指す定数の値として格納する
 //}
 
-//tsize[30,80]
+//tsize[30,100]
 //table[opcode_controlls][制御命令]{
 命令	内容
 -------------------------------------------------------------
@@ -202,33 +208,28 @@ OP_ENTER Ax	メソッドの引数のチェックを行う。 Ax から 5:5:1:5:5
 OP_RETURN A B	 R(A) を戻り値としてメソッドからリターンする
 //}
 
-二項演算命令ではレジスタの値の型が数値、浮動小数点数、文字列かどうかにより結果が変わります。
-これらの条件にマッチしない場合は代わりに SEND 命令を実行します。
-
-//tsize[30,80]
+//tsize[30,100]
 //table[opcode_operations][二項演算命令]{
 命令	内容
 -------------------------------------------------------------
-OP_ADD A B C	R(A) と R(A+1) が整数と浮動小数点数の組み合わせの際に加算結果、文字列同士の場合に結合結果を R(A) に格納する
-OP_SUB A B C	R(A) と R(A+1) が整数と浮動小数点数の組み合わせの際に減算結果を R(A) に格納する
-OP_MUL A B C	R(A) と R(A+1) が整数と浮動小数点数の組み合わせの際に乗算結果を R(A) に格納する
-OP_DIV A B C	R(A) と R(A+1) が整数と浮動小数点数の組み合わせの際に除算結果を R(A) に格納する
-OP_EQ A B C	R(A) と R(A+1) が整数と浮動小数点数の組み合わせの際に比較結果を R(A) に格納する
-OP_LT A B C	R(A) と R(A+1) が整数と浮動小数点数の組み合わせの際に後者の方が大きい値かどうかを R(A) に格納する
-OP_GT A B C	R(A) と R(A+1) が整数と浮動小数点数の組み合わせの際に後者の方が小さい値かどうかを R(A) に格納する
+OP_ADD A B C	R(A) と R(A+1) の加算結果を R(A) に格納する
+OP_SUB A B C	R(A) と R(A+1) の減算結果を R(A) に格納する
+OP_MUL A B C	R(A) と R(A+1) の乗算結果を R(A) に格納する
+OP_DIV A B C	R(A) と R(A+1) の除算結果を R(A) に格納する
+OP_EQ A B C	R(A) と R(A+1) を比較して同値かどうかをを R(A) に格納する
+OP_LT A B C	R(A) と R(A+1) を比較して後者が大きい値かどうかを R(A) に格納する
+OP_GT A B C	R(A) と R(A+1) を比較して後者が小さい値かどうかを R(A) に格納する
 //}
 
-//tsize[40,80]
+//tsize[40,90]
 //table[opcode_objects][オブジェクト操作命令]{
 命令	内容
 -------------------------------------------------------------
-OP_ARRAY A B C	R(B) から R(B+C) に格納されている値をコピーして Array オブジェクトを R(A) に格納
-OP_STRING A Bx	Pool(Bx) に格納された String オブジェクトを複製した結果を R(A) に格納する
+OP_ARRAY A B C	R(B) から R(B+C) に格納されている値をコピーして Array オブジェクトを R(A) に格納する
+OP_STRING A Bx	Pool(Bx) に格納された String オブジェクトを R(A) にコピーする
 OP_HASH A B C	R(B) から R(B+C*2) に格納されているオブジェクトをキーとバリューのペアの繰り返しとみなして読み出し、 Hash オブジェクトを生成して、その結果を R(A) に格納する
-OP_LAMBDA A B C	B 番目の reps から  proc オブジェクトを生成して R(A) に格納する。 C がフラグになり、キャプチャフラグが立っているなら closure として扱う
-OP_CLASS A	新しいクラスを定義する。 R(A) が親クラス、R(A+1) が super、 Syms(B) がクラス名になる。定義し終わったらオブジェクトを生成して R(A) に格納する
+OP_CLASS A	新しいクラスを定義する。 R(A) が親クラス、R(A+1) が super、 Syms(B) がクラス名になる。定義後に、オブジェクトを生成して R(A) に格納する
 OP_METHOD A B	メソッドを定義する。R(A) がクラス、 R(A+1) がメソッドの中身となる proc オブジェクト、 Syms(B) がメソッド名になる
-OP_TCLASS A	mrb->c->ci->target_class のオブジェクトを生成して R(A) に格納する
 //}
 
 //tsize[30,80]
@@ -245,7 +246,7 @@ RiteVM では命令の実行状態を管理するため mrb_state や mrb_contex
 RiteVM の命令実行は irep で表現された命令を解釈しながらこれらのデータを操作していくことで進められていきます。
 各データ構造の関係をざっくり示すと @<img>{mrb_states} のようになります。
 
-//image[mrb_states][RiteVM の状態管理のためのデータ構造]
+//image[mrb_states][RiteVM の状態管理のためのデータ構造][scale=0.7]
 
 もう少し詳細に踏み込んでみましょう。
 
@@ -287,9 +288,9 @@ status, fib	そのコンテキストの持ち主の fiber の実行状態とそ�
 //}
 
 stack というメンバが出てきて混乱を招きそうですが、これは RiteVM としてレジスタとして使っている領域になります。
-メソッドを呼び出す際には新たにスタックを詰んでレシーバオブジェクトや引数をセットし、メソッドから戻る際は戻り値を元々レシーバオブジェクトが存在した領域に格納します。
+メソッドを呼び出す際には新たにスタックを詰んでレシーバオブジェクトや引数、ブロックををセットし、メソッドから戻る際は戻り値を元々レシーバオブジェクトが存在した領域に格納します。
 
-//image[stack][stack 領域の使われ方]
+//image[stack][stack 領域の使われ方][scale=0.8]
 
 Fiber の中身についても少しだけ触れてみます。
 Fiber は @<table>{RFiber} に示す通り、実行コンテキストを保持するオブジェクトです。
@@ -303,7 +304,7 @@ MRB_OBJECT_HEADER	オブジェクトのヘッダ
 cxt	その Fiber オブジェクトの実行コンテキスト
 //}
 
-ちなみに mruby では Fiber は mrbgems として切り出されています。
+ちなみに mruby では Fiber の実装は mrbgems/mruby-fiber/ 以下に存在し、 mrbgem として切り出されています。
 つまりは不要なら Fiber を含まない形でビルドできる訳ですね！
 
 ==== メソッドコールスタック mrb_callinfo
@@ -335,10 +336,10 @@ env	レジスタやシンボル情報を保存する REnv 構造体データ
  * mrb_toplevel_run()
 
 この 3 つの関数は、 mrb_state と RProc をとり RiteVM の実行を開始します。
-複雑な処理はしておらず、メインの処理は mrb_context_run() に任せているように見えます。
+複雑な処理はしておらず、メインの処理は mrb_context_run() に任せています。
 というわけで次は mrb_context_run() を覗いてみましょう。
 この関数は行数が多いですが、行っていることはシンプルです。
-大部分の処理のフローとしては 1) INIT_DISPATCH マクロでオペコードをフェッチ 2) switch 文でオペコードを判別 3) 命令の実行 を for 文でループする形になります。
+大部分の処理のフローとしては 1) オペコードをフェッチ 2) switch 文でオペコードを判別 3) 命令の実行 を for 文でループする形になります。
 
 ==== 初期化処理
 
@@ -355,17 +356,17 @@ env	レジスタやシンボル情報を保存する REnv 構造体データ
 
 まずは INIT_DISPATCH マクロでプログラムカウンタを更新し、 switch 文による分岐を行います。
 次に各命令に対応した case で命令処理を行います。
-各命令の実装を紹介していくとキリがないので詳細は省きますが、概ね GETARG_A() などを用いてオペランドを取り出し、その値から使用するレジスタ、 pools や syms の値を特定し、操作を行います。
+各命令の実装を紹介していくとキリがないので詳細は省きますが、概ね GETARG_A() などのマクロを用いてオペランドを取り出し、その値から使用するレジスタ、 pools や syms の値を特定し、操作を行います。
 例えば OP_MOVE 命令は GETARG_A() と GETARG_B() で A と B を取り出し、それらをインデックスとしてレジスタの値を参照し、代入文を実行します。
 
-メソッド呼び出しやリターンについては少々複雑になっています。
+OP_SEND や OP_RETURN などによって実現されるメソッド呼び出しやリターンについては少々複雑になっています。
 基本的にはこれまで紹介してきた mrb->c->stack や mrb->c->ci 、プログラムカウンタを操作します。
 mrb->c->stack は領域が足りなくなったら stack_extend() で拡張します。
-また mrb->c->ci の push/pop のため cipush()/cipop() を呼び出します。
+また mrb->c->ci の push / pop のため cipush() / cipop() を呼び出します。
 
 ==== RiteVM による実際の irep の解釈例
 
-ある程度 RiteVM の実装の形が見えてきたところで、実際の irep を確認してみましょう。
+これだけでは RiteVM の処理のイメージが見えてこないと思われるので、実際の irep の処理を確認してみましょう。
 コード生成部分で触れた、単純な Hello,World! スクリプトから生成される irep は下記の通りになります。
 
 //cmd{
@@ -377,14 +378,14 @@ file: hello.rb
     1 003 OP_STOP
 //}
 
-生成された irep は 1 個であり、他の irep を参照しません。
-また、 pools の要素は 1 （"Hello,World!" を指す String オブジェクトのため）、 syms の数は 1 （puts メソッドの名前のため）のようです。
-レジスタ数はコード中に明示的に参照している 2 個に合わせて、レシーバオブジェクトとブロックの管理のために更に 2 個要するので合計 4 個になります。
+今回生成された irep は、元のスクリプトがひとつのスコープしかない都合 1 個であり、他の irep を参照しません（reps=0）。
+また、 pools の要素は "Hello,World!" を指す String オブジェクトの分に 1 個（pools=1）、 syms の数は puts メソッドの名前のため 1 個（syms=1）のようです。
+レジスタ数はコード中に明示的に参照している 2 個に合わせて、レシーバオブジェクトとブロックの管理のために更に 2 個要するので合計 4 個（nregs=4）になります。
 
 irep が示す命令の処理フローを追ってみます。
 まず OP_LOADSELF ですが単純に R1 に self を代入します。
 ここでの self はスコープの一番外側である都合、 mrb_top_self() が返す値が入る形になります。
-次の OP_STRING は、 pools に格納された "Hello,World!" という String オブジェクトを取り出し R2 に格納します。
+次の OP_STRING は pools に格納された 0 番目の要素、 "Hello,World!" という String オブジェクトを取り出し R2 に格納します。
 その後 OP_SEND で puts メソッドを呼び出します。
 puts メソッドから見て self は R1 、引数は 1 個で R2 が該当する形になります。
 最後にすべての命令を実行し終えたので OP_STOP で終了処理に入ります。
@@ -392,9 +393,6 @@ puts メソッドから見て self は R1 、引数は 1 個で R2 が該当す�
 ==== 例外処理の詳細
 
 例外処理の実装は複雑なので、別途 irep を出力してそれを足がかりに追ってみます。
-例外処理に関する命令は簡単に分類すると OP_RAISE は raise に関する命令、 OP_ONERR, OP_POPERR, OP_RESCUE は rescue に関する命令、 OP_EPUSH, OP_EPOP は ensure に関する命令になります。
-また例外処理に関するデータとしては、例外クラスを指す mrb->exc と mrb->c->rescue や mrb->c->ensure
-
 まずは @<list>{exc.rb} に示すようなシンプルな例外処理を行うスクリプトを書いてみます。
 
 //listnum[exc.rb][例外処理するスクリプト例][ruby]{
@@ -407,7 +405,7 @@ ensure
 end
 //}
 
-これを --verbose 付きで実行した際に出力される irep に、ざっくりとした処理のフローを加えたものが @<img>{exc} のようになります。
+このスクリプトから生成される irep に、ざっくりとした処理のフローを加えたものが @<img>{exc} のようになります。
 
 //image[exc][例外処理を含む irep とその処理フロー]
 
@@ -420,7 +418,7 @@ end
 その後 OP_SEND で raise メソッドを呼び出します。
 このメソッドは Kernel#raise として src/kernel.c に定義され、 C の関数としては mrb_f_raise() が該当します。
 この関数は引数により取りうる振る舞いが変わりますが、最終的に src/error.c に定義される mrb_exc_raise() を呼び出します。
-そして mrb_exc_raise() では mrb->exc に例外オブジェクトを格納し、 MRB_THROW() マクロで例外と rescue ブロックの捕捉を行います。
+mrb_exc_raise() では mrb->exc に例外オブジェクトを格納し、 MRB_THROW() マクロで例外と rescue ブロックの捕捉を行います。
 
 ここで mrb_context_run() における例外処理の実現方法について触れておきます。
 ざっくりと C のコードで表現すると @<list>{mrb_context_run_exc.c} のようになります。
@@ -436,11 +434,11 @@ MRB_TRY(...) {
 
 mrb_context_run() では命令を処理する for ループを MRB_TRY マクロに続くブロックで囲います。
 この MRB_TRY が setjmp マクロを使って例外が上がった際にジャンプする先として扱われます。
-MRB_TRY のブロック内で MRB_THROW マクロが呼び出されると、これが longjmp() の呼び出しを行なうため MRB_TRY まで戻ってくることになり、かつ MRB_TRY 内の if 文の条件が満たせなくなる戻り値を返すためMRB_CATCH マクロのブロックが実行されます。
+MRB_TRY のブロック内で MRB_THROW マクロが呼び出されると、これが longjmp() を呼び出して MRB_TRY まで戻ってくることになり、かつ MRB_TRY 内の if 文の条件が満たせなくなる戻り値を返すため MRB_CATCH マクロのブロックが実行されます。
 MRB_CATCH マクロのブロックでは例外の捕捉を行なう旨のフラグが true になり、これにより実際に例外処理をする L_RAISE ラベルまでジャンプします。
 
-そんな流れで、 raise メソッドを呼び出した後に mrb_context_run() 内の L_RAISE ラベルにジャンプした後ですが、 mrb_exc_raise() により mrb->exc と、 OP_ONERR により mrb->c->ci->ridx が更新された都合、 rescue の処理が発生すると判断され L_RESCUE ラベルにジャンプします。
-L_RESCUE は mrb->c->rescue から rescue 時にジャンプする先のポインタ、この例では 006 の箇所へジャンプします。
+そんな流れで L_RAISE ラベルにジャンプした後ですが、 mrb->exc と mrb->c->ci->ridx がセットされている都合 rescue の処理が発生すると判断され、 L_RESCUE ラベルにジャンプします。
+L_RESCUE では mrb->c->rescue から rescue 時にジャンプする先のポインタ、この例では 006 の箇所へジャンプします。
 
 006 へジャンプした後は OP_RESCUE により、 raise メソッドによって設定された mrb->exc を R1 にコピーして mbr->exc はゼロクリアします。
 その後 StandardError を R2 に、 R1 にコピーした mrb->exc を R3 にコピーし、 R2 をレシーバオブジェクトとして === メソッドを OP_SEND で呼び出します。
@@ -451,12 +449,12 @@ L_RESCUE は mrb->c->rescue から rescue 時にジャンプする先のポイ�
 これらについては既に触れたとおりなので割愛します。
 puts メソッドの呼び出しまで完了したら OP_JMP で 018 にジャンプします。
 
-018 の OP_EPOP では A に指定された回数だけ mrb->c->ensure に詰まれた ensure の proc を呼び出します。
-この例では A に 1 が指定され、かつ現在の irep の冒頭で OP_EPUSH で ensure の proc が 1 つ詰まれているのでそれを呼び出すことになります。
+018 の OP_EPOP では A の回数だけ mrb->c->ensure に詰まれた proc を呼び出します。
+この例では A に 1 が指定され、かつ冒頭で OP_EPUSH で ensure の proc が 1 つ詰まれているのでそれを呼び出すことになります。
 実際の ensure proc 呼び出しは ecall() という関数に切り出されています。
-ecall() は mrb->c->ensure から ensure proc を取り出して、 cipush() などからなる新しいコールスタックと mbr->c->stack の調整を行い、 mrb_run() で実際の ensure の命令が収められている irep を実行します。
+ecall() は mrb->c->ensure から proc を取り出して、 cipush() などで新しいコールスタックと mbr->c->stack を準備し、 mrb_run() で ensure の命令が収められている irep を実行します。
 
-ensure proc の irep の内容や OP_STOP についてはこれまでで解説済みなので割愛します。
+ensure proc の irep の内容や OP_STOP についてもこれまでで解説済みなので割愛します。
 ・・・以上で、 raise から始まり rescue で例外をキャッチしてから ensure が呼び出されるまでのフローです。
 
 余談ですが、 mrb->c->rescue や mrb->c->ensure のサイズが足りなくなった際は、最初は 16 要素分、その後不足が出た際に 32, 64 と倍々に mrb_realloc() で領域を確保し直します。
