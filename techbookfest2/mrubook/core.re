@@ -81,6 +81,7 @@ mruby の字句・構文解析の実装は parse.y にあります。
 具体的にはスキャナ（字句解析器）が parse.y の parser_yylex() 、パーサ（構文解析器）が yyparse() が該当します。
 この辺りの基本的な設計は CRuby と同じだったりします。
 「Rubyソースコード完全解説」@<bib>{rhg} という素晴らしい書籍に詳細が掲載されていますので、 CRuby と共通している部分の解説は省かせていただこうと思います。
+また、最近ですと「Ruby Under a Microscope」@<bib>{under_microscope} @<bib>{under_microscope_ja} という本で1.8以降のRuby実装に関する解説がしてあります。
 詳しく知りたい方はそちらも合わせてご参照ください。
 
 ざっくり説明しますと、 parser_yylex() は nextc() でソースコードを少しずつ読み出し、 switch 文でトークンを識別し、トークンの内容を返します。
