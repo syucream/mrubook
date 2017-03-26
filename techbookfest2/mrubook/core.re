@@ -22,7 +22,7 @@ RiteVM が解釈する中間表現のコードは mruby では iseq(Instruction 
 さらに RiteVM でコード実行する際には irep を包む形の RProc という構造を渡します。
 これらの構造の関係は @<img>{ireps} のような入れ子の関係になっています。
 
-//image[ireps][mruby の中間表現][scale=0.7]
+//image[ireps][mruby の中間表現][scale=0.5]
 
 === irep (Internal Representation)
 
@@ -203,7 +203,7 @@ OP_SETCONST A Bx	R(A) の値を Syms(Bx) が指す定数の値として格納す
 命令	内容
 -------------------------------------------------------------
 OP_JMP sBx	sBx 分だけプログラムカウンタを増やす
-JMPIF, JMPNOT A sBx	R(A) の評価結果が true/false だった場合、 sBx 分だけプログラムカウンタを増やす
+OP_JMPIF, OP_JMPNOT A sBx	R(A) の評価結果が true/false だった場合、 sBx 分だけプログラムカウンタを増やす
 OP_ONERR sBx	プログラムカウンタに sBx 加算した値を rescue 時処理として実行コンテキストに追加する
 OP_RESCUE A	R(A) に mrb->exc をコピーし、 mrb->exc をクリアする
 OP_POPERR A	実行コンテキストから A の値分だけ rescue 時処理を削除する
