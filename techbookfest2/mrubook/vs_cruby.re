@@ -35,7 +35,7 @@ ed_flags	各要素が空や削除済みかどうかを管理するフラグ配�
 //image[khash][khash のデータ表現（図中の K はキー、 V は値）]
 
 khash ですが、主に @<table>{khash} のような操作をサポートしています。
-kh_init で初期化、 kh_begin と kh_end でイテレーション、 kh_get と kh_put でキーによる操作、 kh_keys と kh_val で要素の参照、 kh_destroy で終了処理というのが基本的な操作かと思われます。
+kh_init で初期化、 kh_begin と kh_end でイテレーション、 kh_get と kh_put でキーによる操作、 kh_key と kh_val で要素の参照、 kh_destroy で終了処理というのが基本的な操作かと思われます。
 
 //tsize[30,90]
 //table[khash][khash の操作関数]{
@@ -104,7 +104,7 @@ mruby では各オブジェクトに「色」の情報を持たせ、色が何�
 
 これは「ガベージコレクション本」@<bib>{gc_book} に記載されている三色抽象化 (tricolour abstraction) に近いものがあります。
 これに加えて mruby はインクリメンタル GC をするので GC のサイクルの途中に新たなオブジェクトが生成され、すぐに回収して良いか判断がつかない場合があります。
-この問題のため、 mruby では白色についてさらに 2 つの状態用意してすぐに回収できるかを分類可能を用意しています。
+この問題のため、 mruby では白色についてさらに 2 つの状態を用意してすぐに回収できるかを分類可能にしています。
 （白色の 2 状態は White-A と White-B という名前が付けられていて、 GC サイクルごとに意味するところが入れ替わります。
 本書では記述のシンプル化のために意味が固定されているような記述をしていますが、適宜脳内補完していただけると幸いです）
 
@@ -193,7 +193,7 @@ incremental_gc_step() はマークフェーズではマークしたオブジェ�
 incremental_gc_until() は指定の状態、 mrb_incremental_gc() から呼び出す際は次のルートスキャンフェーズまでリターンせずに GC を実行します。
 
 mrb_incremental_gc() はもうひとつ、古い世代のオブジェクトが多くなりすぎた際に再び GC の対象にする仕事もしています。
-これは mrb_incremental_gc() のリターン直前に  live が majorgc_old_threshold を超えた場合、全てのオブジェクトを clear_all_old() を介して白でマークし直すことで実現します。
+これは mrb_incremental_gc() のリターン直前に live が majorgc_old_threshold を超えた場合、全てのオブジェクトを clear_all_old() を介して白でマークし直すことで実現します。
 
 ==== mrb_incremental_gc() のさらに先
 
