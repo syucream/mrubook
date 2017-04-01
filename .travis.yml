@@ -19,6 +19,7 @@ install:
 
 script:
     - travis-sphinx --source=./ build
+    - cd ./techbookfest2/ && bundle install && rake epub
 
 after_success:
     - travis-sphinx deploy
