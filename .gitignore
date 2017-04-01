@@ -1,1 +1,5 @@
 _build
+.DS_Store
+*.epub
+*.pdf
+*.html

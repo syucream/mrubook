@@ -1,0 +1,17 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    rake (10.4.2)
+    review (2.1.0)
+      rubyzip
+    rubyzip (1.2.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  rake
+  review (= 2.1.0)
+
+BUNDLED WITH
+   1.13.6

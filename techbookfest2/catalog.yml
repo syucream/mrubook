@@ -1,0 +1,14 @@
+PREDEF:
+
+CHAPS:
+  - intro.re
+  - core.re
+  - vs_cruby.re
+  - epilogue.re
+
+APPENDIX:
+  - bib.re
+  - handmade_irep.re
+
+POSTDEF:
+
